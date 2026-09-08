@@ -1,0 +1,86 @@
+@import url('https://fonts.googleapis.com/css2?family=Gloock&family=Manrope:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+    margin: 0;
+    font-family: 'Manrope', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+@layer base {
+    :root {
+        --background: 48 30% 98%;
+        --foreground: 220 49% 8%;
+        --card: 0 0% 100%;
+        --card-foreground: 220 49% 8%;
+        --popover: 0 0% 100%;
+        --popover-foreground: 220 49% 8%;
+        --primary: 178 82% 24%;
+        --primary-foreground: 0 0% 100%;
+        --secondary: 45 29% 95%;
+        --secondary-foreground: 220 49% 8%;
+        --muted: 45 29% 95%;
+        --muted-foreground: 217 11% 40%;
+        --accent: 173 51% 90%;
+        --accent-foreground: 220 40% 14%;
+        --destructive: 4 76% 40%;
+        --destructive-foreground: 0 0% 100%;
+        --border: 43 24% 87%;
+        --input: 43 24% 87%;
+        --ring: 178 82% 24%;
+        --chart-1: 178 82% 24%;
+        --chart-2: 32 63% 46%;
+        --chart-3: 214 70% 39%;
+        --chart-4: 150 59% 30%;
+        --chart-5: 217 11% 40%;
+        --radius: 0.75rem;
+
+        --amber: 32 63% 46%;
+        --amber-soft: 33 60% 90%;
+        --info: 214 70% 39%;
+        --info-soft: 214 80% 92%;
+        --success: 150 59% 30%;
+        --success-soft: 150 45% 90%;
+        --warning: 30 90% 37%;
+        --warning-soft: 33 80% 88%;
+        --ink-2: 220 40% 12%;
+    }
+}
+
+@layer base {
+    * {
+        @apply border-border;
+    }
+    body {
+        @apply bg-background text-foreground;
+    }
+    .font-display {
+        font-family: 'Gloock', ui-serif, Georgia, serif;
+        font-weight: 400;
+    }
+    .font-mono {
+        font-family: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+    }
+}
+
+@layer utilities {
+    .hero-mist {
+        background:
+            radial-gradient(900px circle at 12% 0%, rgba(11,110,107,0.14), transparent 55%),
+            radial-gradient(760px circle at 88% 6%, rgba(192,122,43,0.12), transparent 52%);
+    }
+    .paper-warmth {
+        background:
+            radial-gradient(700px circle at 15% 0%, rgba(192,122,43,0.10), transparent 55%),
+            radial-gradient(820px circle at 85% 10%, rgba(30,90,168,0.07), transparent 60%);
+    }
+    .card-elev {
+        box-shadow: 0 1px 0 rgba(11,18,32,0.05), 0 12px 30px rgba(11,18,32,0.06);
+    }
+    .card-elev-hover:hover {
+        box-shadow: 0 1px 0 rgba(11,18,32,0.08), 0 18px 44px rgba(11,18,32,0.10);
+    }
+}

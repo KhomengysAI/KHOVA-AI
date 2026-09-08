@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="id"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kantong Otomatis</title>
+<style>
+  :root { --primary:#0B6E6B; --secondary:#111C2E; --accent:#C07A2B; --bg:#FBFAF7; --text:#0B1220; --radius:20px; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif; color:var(--text); background:var(--bg); line-height:1.65; }
+  .wrap { max-width:1080px; margin:0 auto; padding:0 24px; }
+  .btn { display:inline-block; background:var(--primary); color:#fff; padding:15px 30px; border-radius:var(--radius); text-decoration:none; font-weight:700; box-shadow:0 30px 60px rgba(0,0,0,0.14); }
+  .btn.alt { background:var(--accent); }
+  header.hero { background:var(--secondary); color:#fff; padding:130px 0; }
+  header.hero h1 { font-size:clamp(30px,5vw,52px); line-height:1.1; margin-bottom:18px; }
+  header.hero p { font-size:20px; opacity:.9; max-width:640px; margin-bottom:30px; }
+  .brandbar { display:inline-block; font-weight:800; letter-spacing:1px; color:var(--accent); margin-bottom:18px; text-transform:uppercase; font-size:14px; }
+  section { padding:72px 0; }
+  section h2 { font-size:clamp(24px,3.5vw,36px); margin-bottom:26px; color:var(--secondary); }
+  .muted { background:#fff; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:22px; }
+  .card { background:#fff; border:1px solid #e6e2d8; border-radius:var(--radius); padding:26px; box-shadow:0 30px 60px rgba(0,0,0,0.14); }
+  .card h3 { color:var(--primary); margin-bottom:8px; }
+  .cols { display:grid; grid-template-columns:1fr 1fr; gap:24px; }
+  .ba { background:#fff; border-radius:var(--radius); padding:26px; border:1px solid #e6e2d8; }
+  .ba.before { border-top:5px solid #B42318; }
+  .ba.after { border-top:5px solid var(--primary); }
+  .ba h3 { margin-bottom:12px; }
+  ul { margin-left:20px; } li { margin-bottom:8px; }
+  .step { display:flex; gap:16px; align-items:flex-start; margin-bottom:18px; }
+  .step-n { background:var(--primary); color:#fff; width:38px; height:38px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:800; flex:0 0 auto; }
+  details { background:#fff; border:1px solid #e6e2d8; border-radius:var(--radius); padding:16px 20px; margin-bottom:12px; }
+  summary { font-weight:700; cursor:pointer; color:var(--secondary); }
+  details p { margin-top:10px; color:#5b6472; }
+  .cta-band { background:var(--primary); color:#fff; text-align:center; }
+  .cta-band h2 { color:#fff; }
+  .social { background:#fff; border:1px dashed #cbd5c9; border-radius:var(--radius); padding:30px; text-align:center; color:#5b6472; }
+  footer { padding:30px 0; text-align:center; color:#8a8f98; font-size:14px; }
+  @media (max-width:720px) { .cols { grid-template-columns:1fr; } }
+</style></head>
+<body>
+  <header class="hero"><div class="wrap">
+    <span class="brandbar">Kantong Otomatis</span>
+    <h1>Setiap Uang Masuk, Langsung Terbagi Otomatis</h1>
+    <p>Asisten keuangan premium untuk freelancer Indonesia agar uang bisnis, pribadi, pajak, dan tabungan langsung rapi saat dibayar—tanpa spreadsheet, tanpa hitung manual, tanpa takut kecampur.</p>
+    <a class="btn alt" href="#cta">Coba Gratis Sekarang</a>
+  </div></header>
+
+  <section class="muted"><div class="wrap">
+    <h2>Freelancer sering dibayar, tapi tetap bingung uangnya ke mana</h2>
+    <p style="max-width:720px;margin-bottom:16px;">Masalahnya bukan Anda kurang disiplin. Masalahnya, semua pemasukan masuk ke satu tempat lalu bercampur. Saat pendapatan tidak tetap, setiap pembayaran butuh keputusan cepat: berapa untuk pajak, operasional, tabungan, dan berapa yang benar-benar aman dipakai. Tanpa sistem otomatis, uang mudah terpakai duluan oleh kebutuhan yang salah.</p>
+    <ul><li>Uang pribadi dan bisnis bercampur di rekening yang sama</li><li>Pajak sering terlambat disisihkan dan terasa berat saat jatuh tempo</li><li>Tabungan kalah terus oleh kebutuhan harian yang mendesak</li><li>Sulit tahu saldo riil yang benar-benar aman dipakai</li><li>Transfer manual ke banyak rekening terasa repot dan sering terlewat</li></ul>
+  </div></section>
+
+  <section><div class="wrap">
+    <h2>Dari uang yang terasa berantakan menjadi cashflow yang langsung tertata</h2>
+    <div class="cols">
+      <div class="ba before"><h3>Sebelum</h3><ul><li>Setiap notifikasi pembayaran masuk terasa menyenangkan sekaligus bikin tegang</li><li>Harus cek mutasi, hitung persentase, lalu transfer manual berulang kali</li><li>Sering tanpa sadar memakai uang pajak, operasional, atau tabungan</li><li>Saldo terlihat besar, tetapi tidak jelas mana yang benar-benar boleh dipakai</li></ul></div>
+      <div class="ba after"><h3>Sesudah</h3><ul><li>Begitu pembayaran masuk, dana langsung dibagi ke kantong yang tepat</li><li>Anda selalu tahu mana jatah pribadi, bisnis, pajak, dan tabungan</li><li>Kewajiban penting diamankan sejak awal, bukan menunggu sisa</li><li>Keuangan terasa lebih tenang, jelas, dan profesional setiap hari</li></ul></div>
+    </div>
+  </div></section>
+
+  <section class="muted"><div class="wrap">
+    <h2>Kenapa freelancer memilih Kantong Otomatis</h2>
+    <div class="grid"><div class="card"><h3>Autopilot untuk setiap pemasukan</h3><p>Sistem mendeteksi uang masuk lalu otomatis menjalankan aturan alokasi yang sudah Anda tentukan.</p></div><div class="card"><h3>Saldo lebih jujur</h3><p>Lihat dengan jelas berapa uang yang aman dipakai, berapa untuk pajak, dan berapa yang harus tetap diamankan.</p></div><div class="card"><h3>Dirancang untuk pendapatan tidak tetap</h3><p>Bukan sistem untuk gaji bulanan. Dibuat khusus untuk freelancer yang menerima pembayaran dari banyak sumber dan nominal berbeda.</p></div><div class="card"><h3>Kurangi keputusan finansial yang melelahkan</h3><p>Tidak perlu lagi mengandalkan disiplin manual setiap kali ada klien bayar.</p></div><div class="card"><h3>Fleksibel per sumber pemasukan</h3><p>Atur persentase atau nominal berbeda sesuai klien, proyek, rekening, atau kanal pembayaran.</p></div><div class="card"><h3>Lebih ringan dari aplikasi akuntansi</h3><p>Anda tidak perlu software rumit. Cukup sistem yang fokus menjaga arus kas pribadi dan bisnis tetap rapi.</p></div></div>
+  </div></section>
+
+  <section><div class="wrap">
+    <h2>Yang Anda dapatkan</h2>
+    <ul><li>Kantong virtual untuk pajak, tabungan, operasional, dan pribadi</li><li>Integrasi rekening bank dan e-wallet terpilih</li><li>Aturan alokasi otomatis berbasis persentase atau nominal minimum</li><li>Dashboard saldo per kantong yang mudah dipantau</li><li>Aturan berbeda untuk sumber pemasukan yang berbeda</li><li>Pengingat kewajiban pajak dan pos penting lainnya</li><li>Ringkasan arus kas agar Anda tahu ke mana uang bergerak</li><li>Rekomendasi alokasi berdasarkan pola pendapatan Anda</li></ul>
+  </div></section>
+
+  <section class="muted"><div class="wrap">
+    <h2>Cara kerjanya</h2>
+    <div class="step"><div class="step-n">1</div><div><h3>Hubungkan akun Anda</h3><p>Sambungkan rekening bank dan e-wallet yang biasa Anda pakai menerima pembayaran.</p></div></div><div class="step"><div class="step-n">2</div><div><h3>Tentukan aturan pembagian</h3><p>Atur persentase atau nominal untuk tiap kantong seperti pajak, tabungan, operasional, dan pribadi.</p></div></div><div class="step"><div class="step-n">3</div><div><h3>Biarkan sistem bekerja otomatis</h3><p>Setiap ada pemasukan, sistem mendeteksi dan langsung mengalokasikan dana sesuai aturan Anda.</p></div></div><div class="step"><div class="step-n">4</div><div><h3>Pantau saldo yang benar-benar siap dipakai</h3><p>Buka dashboard untuk melihat posisi uang per kantong tanpa perlu hitung manual lagi.</p></div></div>
+  </div></section>
+
+  <section><div class="wrap">
+    <h2>Dipilih freelancer yang ingin uangnya rapi sejak dibayar</h2>
+    <div class="social">Tambahkan testimoni pengguna awal, jumlah akun yang terhubung, total transaksi yang telah dialokasikan otomatis, atau logo media/komunitas freelancer untuk meningkatkan kepercayaan.</div>
+  </div></section>
+
+  <section class="muted"><div class="wrap">
+    <h2>Pertanyaan yang sering ditanyakan</h2>
+    <details><summary>Apakah ini aplikasi budgeting biasa?</summary><p>Bukan. Fokus utama Kantong Otomatis adalah membagi uang secara otomatis saat pemasukan masuk, bukan sekadar mencatat pengeluaran setelah kejadian.</p></details><details><summary>Siapa yang paling cocok menggunakan produk ini?</summary><p>Freelancer, konsultan, kreator, developer, marketer, dan solopreneur dengan pendapatan tidak tetap yang ingin memisahkan uang pribadi, bisnis, pajak, dan tabungan tanpa proses manual.</p></details><details><summary>Apakah saya harus punya banyak rekening?</summary><p>Tidak harus. Anda bisa mulai dengan kantong virtual terlebih dahulu, lalu menyesuaikan dengan rekening atau akun yang ingin dihubungkan.</p></details><details><summary>Bagaimana jika saya menerima pembayaran dari banyak sumber?</summary><p>Itulah kegunaan utamanya. Anda bisa membuat aturan berbeda berdasarkan sumber pemasukan, akun penerima, atau pola nominal tertentu.</p></details><details><summary>Apakah saya masih bisa mengubah aturan pembagian?</summary><p>Tentu. Aturan alokasi fleksibel dan bisa disesuaikan kapan saja sesuai kondisi cashflow Anda.</p></details><details><summary>Apakah produk ini cocok untuk bisnis besar?</summary><p>Produk ini dirancang khusus untuk freelancer dan usaha satu orang yang membutuhkan sistem ringan. Untuk akuntansi bisnis kompleks, solusi ini bukan pengganti software akuntansi penuh.</p></details>
+  </div></section>
+
+  <section class="cta-band" id="cta"><div class="wrap">
+    <h2>Rapikan uang Anda sejak dibayar, bukan saat sudah telanjur tercampur</h2>
+    <p style="margin-bottom:26px;opacity:.9;">Asisten keuangan premium untuk freelancer Indonesia agar uang bisnis, pribadi, pajak, dan tabungan langsung rapi saat dibayar—tanpa spreadsheet, tanpa hitung manual, tanpa takut kecampur.</p>
+    <a class="btn alt" href="#">Mulai Gratis dan Atur Kantong Pertama Anda</a>
+  </div></section>
+
+  <footer><div class="wrap">&copy; Kantong Otomatis — Dibuat dengan Khova AI</div></footer>
+</body></html>

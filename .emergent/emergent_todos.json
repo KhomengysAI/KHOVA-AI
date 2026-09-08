@@ -1,0 +1,34 @@
+[
+  {
+    "content": "Phase 1: POC - all 5 primitives passed",
+    "status": "completed"
+  },
+  {
+    "content": "Phase 2: Design guidelines",
+    "status": "completed"
+  },
+  {
+    "content": "Phase 2: Backend - all agent endpoints + auth (validated)",
+    "status": "completed"
+  },
+  {
+    "content": "Phase 2: Frontend infra + landing + shell + login modal",
+    "status": "completed"
+  },
+  {
+    "content": "Phase 2: Frontend creation wizard + 10 steps + previews/downloads",
+    "status": "completed"
+  },
+  {
+    "content": "Phase 2: Dashboard, projects, settings pages",
+    "status": "completed"
+  },
+  {
+    "content": "Phase 2: Sample project wired into UI",
+    "status": "completed"
+  },
+  {
+    "content": "Phase 2: End-to-end testing (21/22 passed) + fixed login modal auto-close/resume bug (verified)",
+    "status": "completed"
+  }
+]
