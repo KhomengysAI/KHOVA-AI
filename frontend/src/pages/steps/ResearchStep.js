@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { useLang } from '@/lib/i18n';
 import { runResearch } from '@/lib/api';
+import { useAuth } from '@/context/AuthContext';
+import { isAnonLimit } from '@/lib/economy';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
@@ -18,6 +20,7 @@ const LABEL_STYLE = {
 
 export default function ResearchStep({ project, setProject, goTo }) {
   const { t } = useLang();
+  const { setShowLogin } = useAuth();
   const [busy, setBusy] = useState(false);
   const research = project.research;
 
@@ -29,7 +32,10 @@ export default function ResearchStep({ project, setProject, goTo }) {
       if (p.research?.status === 'unavailable') toast.warning(t('toast.research.unavailable'));
       else toast.success(t('toast.research.done', { n: (p.research?.findings || []).length, s: (p.research?.sources || []).length }));
     }
-    catch (e) { toast.error('Riset gagal. Coba lagi.'); }
+    catch (e) {
+      if (isAnonLimit(e)) { toast.error(e?.response?.data?.detail || t('gen.failed')); setShowLogin && setShowLogin(true); }
+      else toast.error(e?.response?.data?.detail || 'Riset gagal. Coba lagi.');
+    }
     finally { setBusy(false); }
   };
 

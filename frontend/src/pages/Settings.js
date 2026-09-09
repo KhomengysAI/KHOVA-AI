@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useLang, LANGUAGE_OPTIONS } from '@/lib/i18n';
 import { useTheme } from '@/context/ThemeContext';
 import { useAuth } from '@/context/AuthContext';
-import { getSettings, putSettings, getEconomy, redeemCode } from '@/lib/api';
+import { getSettings, putSettings, getEconomy, redeemCode, getUsage } from '@/lib/api';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,7 +11,7 @@ import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
-import { Moon, Sun, Ticket, ShieldCheck, Sparkles } from 'lucide-react';
+import { Moon, Sun, Ticket, ShieldCheck, Sparkles, BarChart3 } from 'lucide-react';
 import { toast } from 'sonner';
 
 const PLAN_LABEL = { free: 'plan.free', creator: 'plan.creator', pro: 'plan.pro' };
@@ -23,14 +23,17 @@ export default function Settings() {
   const navigate = useNavigate();
   const [productLang, setProductLang] = useState(localStorage.getItem('khova_product_lang') || 'id');
   const [economy, setEconomy] = useState(null);
+  const [usage, setUsage] = useState(null);
   const [code, setCode] = useState('');
   const [redeeming, setRedeeming] = useState(false);
 
   const loadEconomy = () => { getEconomy().then(setEconomy).catch(() => setEconomy(null)); };
+  const loadUsage = () => { getUsage().then(setUsage).catch(() => setUsage(null)); };
 
   useEffect(() => {
     getSettings().then(s => { if (s.product_language) setProductLang(s.product_language); }).catch(() => {});
     loadEconomy();
+    loadUsage();
   }, []);
 
   const save = async () => {
@@ -49,6 +52,7 @@ export default function Settings() {
       });
       setCode('');
       loadEconomy();
+      loadUsage();
     } catch (e) {
       toast.error(e?.response?.data?.detail || 'Invalid or expired code.');
     } finally { setRedeeming(false); }
@@ -125,6 +129,52 @@ export default function Settings() {
             <Button variant="secondary" className="mt-5 gap-2" onClick={() => navigate('/admin')} data-testid="settings-admin-link">
               <ShieldCheck className="w-4 h-4" /> {t('settings.admin')}
             </Button>
+          )}
+        </Card>
+      )}
+
+      {/* Usage Insights (own data only) */}
+      {usage && (
+        <Card className="p-6 bg-card card-elev mb-6" data-testid="settings-usage-card">
+          <h2 className="font-semibold mb-4 flex items-center gap-2"><BarChart3 className="w-4 h-4 text-primary" /> {t('usage.title')}</h2>
+          <div className="grid sm:grid-cols-3 gap-4">
+            <div className="rounded-xl bg-secondary p-4">
+              <div className="text-xs uppercase tracking-wide text-muted-foreground">{t('usage.remaining')}</div>
+              <div className="font-display text-2xl mt-1" data-testid="usage-credits-remaining">{usage.credits_remaining}</div>
+            </div>
+            <div className="rounded-xl bg-secondary p-4">
+              <div className="text-xs uppercase tracking-wide text-muted-foreground">{t('usage.used')}</div>
+              <div className="font-display text-2xl mt-1" data-testid="usage-credits-used">{usage.total_credits_used}</div>
+            </div>
+            <div className="rounded-xl bg-secondary p-4">
+              <div className="text-xs uppercase tracking-wide text-muted-foreground">{t('usage.gens')}</div>
+              <div className="font-display text-2xl mt-1" data-testid="usage-generations">{usage.product_generations}</div>
+            </div>
+          </div>
+
+          {(usage.products || []).length > 0 ? (
+            <div className="mt-6">
+              <div className="text-xs uppercase tracking-wide text-muted-foreground mb-3">{t('usage.perproduct')}</div>
+              <div className="space-y-3" data-testid="usage-per-product">
+                {usage.products.map((p) => {
+                  const max = Math.max(...usage.products.map(x => x.credits_used), 1);
+                  const pct = Math.max(4, Math.round((p.credits_used / max) * 100));
+                  return (
+                    <div key={p.project_id}>
+                      <div className="flex items-center justify-between text-sm mb-1">
+                        <span className="truncate max-w-[70%]">{p.title}</span>
+                        <span className="font-mono text-xs text-muted-foreground">{p.credits_used} · {t('usage.gencount', { n: p.generations })}</span>
+                      </div>
+                      <div className="h-2.5 rounded-full bg-secondary overflow-hidden">
+                        <div className="h-full rounded-full bg-primary" style={{ width: `${pct}%` }} />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground mt-5" data-testid="usage-empty">{t('usage.empty')}</p>
           )}
         </Card>
       )}

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useLang } from '@/lib/i18n';
 import { runQA, applyQA, applyQAIssue } from '@/lib/api';
-import { afterGeneration, creditDescription } from '@/lib/economy';
+import { afterGeneration, creditDescription, generationErrorMessage } from '@/lib/economy';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -19,7 +19,7 @@ export default function QAStep({ project, setProject, goTo, ensureAuth }) {
   const [applyingId, setApplyingId] = useState(null);
   const report = (project.qa || [])[0];
 
-  const run = () => { if (!ensureAuth(run)) return; (async () => { setBusy(true); try { const p = await runQA(project.id); setProject(p); toast.success(t('toast.qa.done', { n: p.qa?.[0]?.overall }), { description: creditDescription(p, t) }); afterGeneration(p, t); } catch (e) { toast.error(e?.response?.data?.detail || 'QA failed.'); } finally { setBusy(false); } })(); };
+  const run = () => { if (!ensureAuth(run)) return; (async () => { setBusy(true); try { const p = await runQA(project.id); setProject(p); toast.success(t('toast.qa.done', { n: p.qa?.[0]?.overall }), { description: creditDescription(p, t) }); afterGeneration(p, t); } catch (e) { toast.error(generationErrorMessage(e, t, 'QA failed.').message); } finally { setBusy(false); } })(); };
   const apply = async () => {
     setApplying(true);
     try {
@@ -27,7 +27,7 @@ export default function QAStep({ project, setProject, goTo, ensureAuth }) {
       setProject(p);
       toast.success(t('toast.qa.apply.done'), { description: creditDescription(p, t), action: { label: t('toast.qa.apply.open'), onClick: () => goTo('create') } });
       afterGeneration(p, t);
-    } catch (e) { toast.error(e?.response?.data?.detail || 'Failed.'); }
+    } catch (e) { toast.error(generationErrorMessage(e, t, 'Failed.').message); }
     finally { setApplying(false); }
   };
   const applyOne = (iss) => {
@@ -40,7 +40,7 @@ export default function QAStep({ project, setProject, goTo, ensureAuth }) {
         const target = p._applied?.target ? ` (${p._applied.target})` : '';
         toast.success(`${t('qa.applied')}${target}`, { description: [t('qa.preview.updated'), creditDescription(p, t)].filter(Boolean).join(' · '), action: { label: t('toast.qa.apply.open'), onClick: () => goTo('create') } });
         afterGeneration(p, t);
-      } catch (e) { toast.error(e?.response?.data?.detail || 'Failed.'); }
+      } catch (e) { toast.error(generationErrorMessage(e, t, 'Failed.').message); }
       finally { setApplyingId(null); }
     })();
   };

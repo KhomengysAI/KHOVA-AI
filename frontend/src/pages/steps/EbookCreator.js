@@ -10,6 +10,7 @@ import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuIte
 import { BookOpen, ArrowRight, RefreshCw, Wand2, Image as ImageIcon, Eye, Check, Loader2, MoreHorizontal, FileText, Download, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 import { downloadUrl } from '@/lib/api';
+import { generationErrorMessage } from '@/lib/economy';
 
 export default function EbookCreator({ project, setProject, goTo, ensureAuth }) {
   const { t } = useLang();
@@ -20,9 +21,9 @@ export default function EbookCreator({ project, setProject, goTo, ensureAuth }) 
   const [illoAllBusy, setIlloAllBusy] = useState(false);
   const ebook = project.ebook;
 
-  const doPlan = () => { if (!ensureAuth(doPlan)) return; (async () => { setBusy(true); try { const p = await ebookPlan(project.id); setProject(p); toast.success('Rencana ebook dibuat'); } catch (e) { toast.error(e?.response?.data?.detail || 'Gagal.'); } finally { setBusy(false); } })(); };
+  const doPlan = () => { if (!ensureAuth(doPlan)) return; (async () => { setBusy(true); try { const p = await ebookPlan(project.id); setProject(p); toast.success('Rencana ebook dibuat'); } catch (e) { toast.error(generationErrorMessage(e, t, 'Gagal.').message); } finally { setBusy(false); } })(); };
 
-  const genSection = async (num) => { if (!ensureAuth(() => genSection(num))) return; setGenCh(num); try { const p = await ebookSection(project.id, num); setProject(p); } catch (e) { toast.error('Gagal membuat bab.'); } finally { setGenCh(null); } };
+  const genSection = async (num) => { if (!ensureAuth(() => genSection(num))) return; setGenCh(num); try { const p = await ebookSection(project.id, num); setProject(p); } catch (e) { toast.error(generationErrorMessage(e, t, 'Gagal membuat bab.').message); } finally { setGenCh(null); } };
 
   const genAll = async () => {
     if (!ensureAuth(genAll)) return;
@@ -40,7 +41,7 @@ export default function EbookCreator({ project, setProject, goTo, ensureAuth }) 
   };
 
   const doIntro = async () => { if (!ensureAuth(doIntro)) return; setBusy(true); try { const p = await ebookIntro(project.id); setProject(p); toast.success('Pendahuluan dibuat'); } catch (e) { toast.error('Gagal.'); } finally { setBusy(false); } };
-  const doCover = async () => { if (!ensureAuth(doCover)) return; setCoverBusy(true); try { const p = await ebookCover(project.id); setProject(p); toast.success('Cover dibuat'); } catch (e) { toast.error('Gagal membuat cover.'); } finally { setCoverBusy(false); } };
+  const doCover = async () => { if (!ensureAuth(doCover)) return; setCoverBusy(true); try { const p = await ebookCover(project.id); setProject(p); toast.success('Cover dibuat'); } catch (e) { toast.error(generationErrorMessage(e, t, 'Gagal membuat cover.').message); } finally { setCoverBusy(false); } };
   const rewrite = async (num, instruction) => { setGenCh(num); try { const p = await ebookRewrite(project.id, num, instruction); setProject(p); toast.success('Bab diperbarui'); } catch (e) { toast.error('Gagal.'); } finally { setGenCh(null); } };
   const genIllo = async (num) => { setGenCh(num); try { const p = await ebookIllustration(project.id, num); setProject(p); toast.success('Ilustrasi dibuat'); } catch (e) { toast.error('Gagal.'); } finally { setGenCh(null); } };
   const genAllIllos = async () => {
@@ -60,7 +61,7 @@ export default function EbookCreator({ project, setProject, goTo, ensureAuth }) 
   const genBonusAsset = async (idx) => {
     setBonusBusy(idx);
     try { const p = await ebookBonusGenerate(project.id, idx); setProject(p); toast.success('Bonus siap diunduh'); }
-    catch (e) { toast.error(e?.response?.data?.detail || 'Gagal membuat bonus.'); }
+    catch (e) { toast.error(generationErrorMessage(e, t, 'Gagal membuat bonus.').message); }
     finally { setBonusBusy(null); }
   };
 

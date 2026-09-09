@@ -163,10 +163,34 @@ async def complete(user: dict, proj: dict, job: dict) -> dict:
     return {"balance": balance, "cost": charged, "counted_creation": counted_creation}
 
 
-async def fail(job: dict, error: str) -> None:
+async def fail(job: dict, error: str, refund: bool = True) -> int:
+    """Mark a job FAILED. If credits were already charged for this job (the
+    reserve->charge-on-success path normally charges only on completion, so this
+    is the defensive charged-then-failed case), atomically refund them.
+
+    Returns the number of credits refunded (0 when nothing was charged). Callers
+    that don't care can ignore the return value — behaviour is unchanged for the
+    common no-charge failure."""
+    refunded = 0
+    charged = int(job.get("credits_charged") or 0)
+    user_id = job.get("user_id")
+    if refund and charged > 0 and user_id:
+        try:
+            await billing.refund_credits(user_id, charged, f"job_failed:{job.get('task')}", job_id=job.get("id"))
+            refunded = charged
+        except Exception as e:  # never let a refund error mask the original failure
+            logger.error("refund on fail failed for job %s: %s", job.get("id"), e)
+            refunded = 0
+    update = {"status": "failed", "error": str(error)[:500], "completed_at": now_iso()}
+    if refunded:
+        update["credits_refunded"] = refunded
+        update["credits_charged"] = 0
     await db.generation_jobs.update_one(
         {"id": job["id"]},
-        {"$set": {"status": "failed", "error": str(error)[:500], "completed_at": now_iso()},
-         "$inc": {"retry_count": 1}},
+        {"$set": update, "$inc": {"retry_count": 1}},
     )
     job["status"] = "failed"
+    if refunded:
+        job["credits_refunded"] = refunded
+        job["credits_charged"] = 0
+    return refunded

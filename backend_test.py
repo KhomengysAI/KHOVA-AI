@@ -8,7 +8,7 @@ import json
 from datetime import datetime
 
 class KhovaAPITester:
-    def __init__(self, base_url="https://idea-to-asset.preview.emergentagent.com/api"):
+    def __init__(self, base_url="https://khova-v1-hardening.preview.emergentagent.com/api"):
         self.base_url = base_url
         self.session = requests.Session()
         self.session.headers.update({'Content-Type': 'application/json'})

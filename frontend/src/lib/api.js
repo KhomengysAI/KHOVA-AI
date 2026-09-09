@@ -14,6 +14,24 @@ api.interceptors.response.use((resp) => {
     }
   } catch (e) { /* noop */ }
   return resp;
+}, (error) => {
+  // Normalize structured error payloads. The backend returns a dict `detail`
+  // for generation failures / anonymous limits: { message, code, refunded, balance, ... }.
+  // Keep `detail` a string (so existing `e.response.data.detail` usage still works)
+  // and expose the structured info under `_structured` / `_refund`.
+  try {
+    const d = error && error.response && error.response.data;
+    if (d && d.detail && typeof d.detail === 'object') {
+      const obj = d.detail;
+      d._structured = obj;
+      d.detail = obj.message || obj.detail || 'Something went wrong.';
+      if (obj.refunded && Number(obj.refunded) > 0) {
+        d._refund = { refunded: Number(obj.refunded), balance: obj.balance };
+        window.dispatchEvent(new Event('khova:economy'));
+      }
+    }
+  } catch (e) { /* noop */ }
+  return Promise.reject(error);
 });
 
 export const apiRaw = api;
@@ -30,6 +48,7 @@ export const putSettings = (body) => api.put('/settings', body).then(r => r.data
 
 // --- economy (plan / credits / usage) ---
 export const getEconomy = () => api.get('/me/economy').then(r => r.data);
+export const getUsage = () => api.get('/me/usage').then(r => r.data);
 export const redeemCode = (code) => api.post('/redeem', { code }).then(r => r.data);
 
 // --- admin ---
@@ -83,6 +102,7 @@ export const websiteEdit = (id, spec) => api.patch(`/projects/${id}/website/spec
 export const websiteRegenSection = (id, section, instruction) => api.post(`/projects/${id}/website/section/regenerate`, { section, instruction }).then(r => r.data);
 export const websitePublish = (id) => api.post(`/projects/${id}/website/publish`).then(r => r.data);
 export const websiteUnpublish = (id) => api.post(`/projects/${id}/website/unpublish`).then(r => r.data);
+export const websiteSetStyle = (id, style) => api.patch(`/projects/${id}/website/style`, { style }).then(r => r.data);
 export const siteUrl = (id) => `${API_BASE}/sites/${id}`;
 export const sitePreviewUrl = (id) => `${API_BASE}/sites/${id}?preview=1`;
 
@@ -96,3 +116,5 @@ export const ebookBonusGenerate = (id, index) => api.post(`/projects/${id}/ebook
 
 // --- assets ---
 export const downloadUrl = (id, assetId) => `${API_BASE}/projects/${id}/assets/${assetId}/download`;
+export const bundleDownloadUrl = (id) => `${API_BASE}/projects/${id}/bundle`;
+export const fetchBundle = (id) => apiRaw.get(`/projects/${id}/bundle`, { responseType: 'blob' });

@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useLang } from '@/lib/i18n';
 import { genPositioning, patchProject } from '@/lib/api';
+import { useAuth } from '@/context/AuthContext';
+import { isAnonLimit } from '@/lib/economy';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -19,6 +21,7 @@ const FIELDS = [
 
 export default function PositioningStep({ project, setProject, goTo, ensureAuth }) {
   const { t } = useLang();
+  const { setShowLogin } = useAuth();
   const [busy, setBusy] = useState(false);
   const [pos, setPos] = useState(project.positioning || null);
   useEffect(() => { setPos(project.positioning || null); }, [project.positioning]);
@@ -26,7 +29,10 @@ export default function PositioningStep({ project, setProject, goTo, ensureAuth 
   const gen = async () => {
     setBusy(true);
     try { const p = await genPositioning(project.id); setProject(p); setPos(p.positioning); }
-    catch (e) { toast.error('Gagal. Pastikan peluang sudah dipilih.'); }
+    catch (e) {
+      if (isAnonLimit(e)) { toast.error(e?.response?.data?.detail || t('gen.failed')); setShowLogin && setShowLogin(true); }
+      else toast.error(e?.response?.data?.detail || 'Gagal. Pastikan peluang sudah dipilih.');
+    }
     finally { setBusy(false); }
   };
   const save = async () => { const p = await patchProject(project.id, { positioning: pos }); setProject(p); toast.success(t('common.saved')); };

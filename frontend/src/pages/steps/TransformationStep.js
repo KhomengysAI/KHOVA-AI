@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useLang } from '@/lib/i18n';
 import { genTransformation, patchProject, setPalette } from '@/lib/api';
+import { useAuth } from '@/context/AuthContext';
+import { isAnonLimit } from '@/lib/economy';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
@@ -12,6 +14,7 @@ import { toast } from 'sonner';
 
 export default function TransformationStep({ project, setProject, goTo }) {
   const { t, lang } = useLang();
+  const { setShowLogin } = useAuth();
   const [busy, setBusy] = useState(false);
   const [tr, setTr] = useState(project.transformation || null);
   useEffect(() => { setTr(project.transformation || null); }, [project.transformation]);
@@ -19,7 +22,10 @@ export default function TransformationStep({ project, setProject, goTo }) {
   const gen = async () => {
     setBusy(true);
     try { const p = await genTransformation(project.id); setProject(p); setTr(p.transformation); toast.success(t('toast.trans.done')); }
-    catch (e) { toast.error('Gagal. Pastikan positioning sudah dibuat.'); }
+    catch (e) {
+      if (isAnonLimit(e)) { toast.error(e?.response?.data?.detail || t('gen.failed')); setShowLogin && setShowLogin(true); }
+      else toast.error(e?.response?.data?.detail || 'Gagal. Pastikan positioning sudah dibuat.');
+    }
     finally { setBusy(false); }
   };
   const save = async () => { const p = await patchProject(project.id, { transformation: tr }); setProject(p); toast.success(t('common.saved')); };

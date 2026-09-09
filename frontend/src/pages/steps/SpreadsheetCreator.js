@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useLang } from '@/lib/i18n';
 import { spreadsheetSpec, spreadsheetBuild, downloadUrl } from '@/lib/api';
+import { generationErrorMessage } from '@/lib/economy';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -14,7 +15,7 @@ export default function SpreadsheetCreator({ project, setProject, goTo, ensureAu
   const [building, setBuilding] = useState(false);
   const ss = project.spreadsheet;
 
-  const doSpec = () => { if (!ensureAuth(doSpec)) return; (async () => { setBusy(true); try { const p = await spreadsheetSpec(project.id); setProject(p); toast.success('Struktur spreadsheet dibuat'); } catch (e) { toast.error(e?.response?.data?.detail || 'Gagal.'); } finally { setBusy(false); } })(); };
+  const doSpec = () => { if (!ensureAuth(doSpec)) return; (async () => { setBusy(true); try { const p = await spreadsheetSpec(project.id); setProject(p); toast.success('Struktur spreadsheet dibuat'); } catch (e) { toast.error(generationErrorMessage(e, t, 'Gagal.').message); } finally { setBusy(false); } })(); };
   const doBuild = () => { if (!ensureAuth(doBuild)) return; (async () => { setBuilding(true); try { const r = await spreadsheetBuild(project.id); setProject(r.project); toast.success('File XLSX dibuat'); } catch (e) { toast.error('Gagal build XLSX.'); } finally { setBuilding(false); } })(); };
 
   if (busy) return <Working label="Merancang struktur spreadsheet..." />;

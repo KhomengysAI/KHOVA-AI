@@ -492,12 +492,45 @@ def build_xlsx(spec: dict, palette: dict = None) -> bytes:
 # ---------------------------------------------------------------------------
 # WEBSITE -> standalone HTML
 # ---------------------------------------------------------------------------
+# Deterministic website visual themes/presets. These control typography,
+# spacing, radius, button treatment and visual hierarchy ONLY — the canonical
+# product palette (passed separately) remains the source of truth for colors.
+_SANS = "-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif"
+_SERIF = "Georgia,'Times New Roman',Cambria,'Noto Serif',serif"
+
 STYLE_PRESETS = {
-    "Minimal": {"radius": "6px", "shadow": "0 1px 2px rgba(0,0,0,0.06)", "hero_pad": "80px"},
-    "Modern": {"radius": "16px", "shadow": "0 20px 45px rgba(0,0,0,0.10)", "hero_pad": "110px"},
-    "Premium": {"radius": "20px", "shadow": "0 30px 60px rgba(0,0,0,0.14)", "hero_pad": "130px"},
-    "Editorial": {"radius": "2px", "shadow": "0 1px 0 rgba(0,0,0,0.10)", "hero_pad": "90px"},
-    "Bold": {"radius": "12px", "shadow": "0 24px 50px rgba(0,0,0,0.18)", "hero_pad": "120px"},
+    "Minimal": {
+        "radius": "6px", "shadow": "0 1px 2px rgba(0,0,0,0.06)", "hero_pad": "80px",
+        "heading_font": _SANS, "body_font": _SANS, "heading_weight": "600",
+        "letter_spacing": "-0.01em", "section_pad": "60px", "max_width": "1000px",
+        "btn_transform": "", "hero_align": "left", "card_border": "1px solid #ececec",
+    },
+    "Modern": {
+        "radius": "16px", "shadow": "0 20px 45px rgba(0,0,0,0.10)", "hero_pad": "110px",
+        "heading_font": _SANS, "body_font": _SANS, "heading_weight": "800",
+        "letter_spacing": "-0.02em", "section_pad": "72px", "max_width": "1080px",
+        "btn_transform": "", "hero_align": "left", "card_border": "1px solid #e6e2d8",
+    },
+    "Premium": {
+        "radius": "20px", "shadow": "0 30px 60px rgba(0,0,0,0.14)", "hero_pad": "130px",
+        "heading_font": _SERIF, "body_font": _SANS, "heading_weight": "700",
+        "letter_spacing": "-0.01em", "section_pad": "88px", "max_width": "1120px",
+        "btn_transform": "letter-spacing:0.5px;", "hero_align": "center", "card_border": "1px solid #ece7dd",
+    },
+    "Editorial": {
+        "radius": "2px", "shadow": "0 1px 0 rgba(0,0,0,0.10)", "hero_pad": "90px",
+        "heading_font": _SERIF, "body_font": _SERIF, "heading_weight": "700",
+        "letter_spacing": "0", "section_pad": "68px", "max_width": "920px",
+        "btn_transform": "text-transform:uppercase;letter-spacing:1.5px;font-size:13px;",
+        "hero_align": "left", "card_border": "1px solid #dcdcdc",
+    },
+    "Bold": {
+        "radius": "12px", "shadow": "0 24px 50px rgba(0,0,0,0.18)", "hero_pad": "120px",
+        "heading_font": _SANS, "body_font": _SANS, "heading_weight": "900",
+        "letter_spacing": "-0.03em", "section_pad": "80px", "max_width": "1120px",
+        "btn_transform": "text-transform:uppercase;letter-spacing:1px;",
+        "hero_align": "left", "card_border": "2px solid var(--secondary)",
+    },
 }
 
 
@@ -550,31 +583,33 @@ def build_website_html(spec: dict, palette: dict = None, style: str = "Modern", 
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{esc(brand)}</title>
 <style>
-  :root {{ --primary:{primary}; --secondary:{secondary}; --accent:{accent}; --bg:{bg}; --text:{text}; --radius:{preset['radius']}; }}
+  :root {{ --primary:{primary}; --secondary:{secondary}; --accent:{accent}; --bg:{bg}; --text:{text}; --radius:{preset['radius']};
+           --heading-font:{preset['heading_font']}; --body-font:{preset['body_font']}; --max-width:{preset['max_width']}; --section-pad:{preset['section_pad']}; }}
   * {{ box-sizing:border-box; margin:0; padding:0; }}
-  body {{ font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif; color:var(--text); background:var(--bg); line-height:1.65; }}
-  .wrap {{ max-width:1080px; margin:0 auto; padding:0 24px; }}
-  .btn {{ display:inline-block; background:var(--primary); color:#fff; padding:15px 30px; border-radius:var(--radius); text-decoration:none; font-weight:700; box-shadow:{preset['shadow']}; }}
+  body {{ font-family:var(--body-font); color:var(--text); background:var(--bg); line-height:1.65; }}
+  h1,h2,h3 {{ font-family:var(--heading-font); letter-spacing:{preset['letter_spacing']}; }}
+  .wrap {{ max-width:var(--max-width); margin:0 auto; padding:0 24px; }}
+  .btn {{ display:inline-block; background:var(--primary); color:#fff; padding:15px 30px; border-radius:var(--radius); text-decoration:none; font-weight:700; box-shadow:{preset['shadow']}; {preset['btn_transform']} }}
   .btn.alt {{ background:var(--accent); }}
-  header.hero {{ background:var(--secondary); color:#fff; padding:{preset['hero_pad']} 0; }}
-  header.hero h1 {{ font-size:clamp(30px,5vw,52px); line-height:1.1; margin-bottom:18px; }}
-  header.hero p {{ font-size:20px; opacity:.9; max-width:640px; margin-bottom:30px; }}
+  header.hero {{ background:var(--secondary); color:#fff; padding:{preset['hero_pad']} 0; text-align:{preset['hero_align']}; }}
+  header.hero h1 {{ font-size:clamp(30px,5vw,52px); line-height:1.1; margin-bottom:18px; font-weight:{preset['heading_weight']}; }}
+  header.hero p {{ font-size:20px; opacity:.9; max-width:640px; margin-bottom:30px; {('margin-left:auto;margin-right:auto;' if preset['hero_align']=='center' else '')} }}
   .brandbar {{ display:inline-block; font-weight:800; letter-spacing:1px; color:var(--accent); margin-bottom:18px; text-transform:uppercase; font-size:14px; }}
-  section {{ padding:72px 0; }}
-  section h2 {{ font-size:clamp(24px,3.5vw,36px); margin-bottom:26px; color:var(--secondary); }}
+  section {{ padding:var(--section-pad) 0; }}
+  section h2 {{ font-size:clamp(24px,3.5vw,36px); margin-bottom:26px; color:var(--secondary); font-weight:{preset['heading_weight']}; }}
   .muted {{ background:#fff; }}
   .grid {{ display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:22px; }}
-  .card {{ background:#fff; border:1px solid #e6e2d8; border-radius:var(--radius); padding:26px; box-shadow:{preset['shadow']}; }}
+  .card {{ background:#fff; border:{preset['card_border']}; border-radius:var(--radius); padding:26px; box-shadow:{preset['shadow']}; }}
   .card h3 {{ color:var(--primary); margin-bottom:8px; }}
   .cols {{ display:grid; grid-template-columns:1fr 1fr; gap:24px; }}
-  .ba {{ background:#fff; border-radius:var(--radius); padding:26px; border:1px solid #e6e2d8; }}
+  .ba {{ background:#fff; border-radius:var(--radius); padding:26px; border:{preset['card_border']}; }}
   .ba.before {{ border-top:5px solid #B42318; }}
   .ba.after {{ border-top:5px solid var(--primary); }}
   .ba h3 {{ margin-bottom:12px; }}
   ul {{ margin-left:20px; }} li {{ margin-bottom:8px; }}
   .step {{ display:flex; gap:16px; align-items:flex-start; margin-bottom:18px; }}
   .step-n {{ background:var(--primary); color:#fff; width:38px; height:38px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:800; flex:0 0 auto; }}
-  details {{ background:#fff; border:1px solid #e6e2d8; border-radius:var(--radius); padding:16px 20px; margin-bottom:12px; }}
+  details {{ background:#fff; border:{preset['card_border']}; border-radius:var(--radius); padding:16px 20px; margin-bottom:12px; }}
   summary {{ font-weight:700; cursor:pointer; color:var(--secondary); }}
   details p {{ margin-top:10px; color:#5b6472; }}
   .cta-band {{ background:var(--primary); color:#fff; text-align:center; }}

@@ -18,7 +18,9 @@ Run:  python tests/test_phase34.py
 """
 import os
 import sys
+import io
 import uuid
+import zipfile
 import asyncio
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -79,11 +81,32 @@ async def _mock_rewrite(existing_html, instruction, lang, mc, is_math=False):
     return existing_html + "<!-- rewritten -->"
 
 
+async def _mock_research(discover, lang, mc):
+    return {"status": "complete", "findings": [{"label": "HYPOTHESIS", "text": "x"}],
+            "sources": [{"title": "s", "url": "http://x"}], "summary": "sum"}
+
+
+async def _mock_opps(discover, research, lang, mc):
+    return [{"id": f"op_{i}", "name": f"Opp {i}", "scores": {}, "overall_score": 7} for i in range(3)]
+
+
+async def _mock_positioning(opp, discover, lang, mc):
+    return {"one_liner": "x", "target_customer": "y"}
+
+
+async def _mock_transformation(opp, positioning, lang, mc):
+    return {"core_transformation": "x", "categories": []}
+
+
 def install_mocks():
     agents.generate_website_spec = _mock_website_spec
     agents.regenerate_website_section = _mock_website_section
     agents.qa_review = _mock_qa_review
     agents.rewrite_section = _mock_rewrite
+    agents.run_market_research = _mock_research
+    agents.generate_opportunities = _mock_opps
+    agents.generate_positioning = _mock_positioning
+    agents.generate_transformation = _mock_transformation
 
 
 async def login(client, email, name):
@@ -253,6 +276,134 @@ async def main():
         check("only targeted issue resolved", issues_after[0]["resolved"] is True and issues_after[1]["resolved"] is False)
         check("intro untouched (other issue not applied)", proj_after["ebook"]["introduction_html"] == "<p>intro</p>")
 
+        # ================= FINAL HARDENING PHASE TESTS =================
+        import ratelimit
+        from db import GENERATED_DIR
+
+        # ---- Anonymous AI rate limiting (Priority 1) ----
+        # Deterministic limits for the test (limits() reads env live).
+        os.environ["KHOVA_ANON_MAX_AI"] = "3"
+        os.environ["KHOVA_ANON_MIN_INTERVAL_SEC"] = "0"
+        os.environ["KHOVA_ANON_DEDUP_SEC"] = "0"
+        os.environ["KHOVA_ANON_COOLDOWN_SEC"] = "60"
+        os.environ["KHOVA_ANON_WINDOW_SEC"] = "3600"
+
+        anon_proj = (await c.post("/api/projects", json={"title": "Anon"})).json()
+        apid = anon_proj["id"]; project_ids.append(apid)
+        ip1 = {"X-Forwarded-For": "203.0.113.10"}
+        statuses = [(await c.post(f"/api/projects/{apid}/research", headers=ip1)).status_code for _ in range(5)]
+        check("anon: first 3 AI requests allowed", statuses[:3] == [200, 200, 200])
+        check("anon: request past the limit blocked (429)", statuses[3] == 429)
+        blk = await c.post(f"/api/projects/{apid}/research", headers=ip1)
+        check("anon: cooldown keeps blocking (429)", blk.status_code == 429)
+        _d = blk.json().get("detail")
+        _msg = _d.get("message") if isinstance(_d, dict) else str(_d)
+        check("anon: block message tells user to sign in", "sign in" in _msg.lower())
+        check("anon: exactly 3 usage records recorded server-side",
+              (await db.anon_ai_usage.count_documents({"ip": "203.0.113.10"})) == 3)
+
+        # authenticated user is NOT subject to the anon limit (uses entitlements)
+        auth_statuses = [(await c.post(f"/api/projects/{apid}/research", headers={**uh, "X-Forwarded-For": "203.0.113.10"})).status_code for _ in range(5)]
+        check("authenticated user bypasses anon limit entirely", all(s == 200 for s in auth_statuses))
+
+        # duplicate / simultaneous flood guard (fresh IP)
+        os.environ["KHOVA_ANON_DEDUP_SEC"] = "30"; os.environ["KHOVA_ANON_MAX_AI"] = "50"
+        ip2 = {"X-Forwarded-For": "203.0.113.20"}
+        ap2 = (await c.post("/api/projects", json={"title": "Anon2"})).json()["id"]; project_ids.append(ap2)
+        d1 = await c.post(f"/api/projects/{ap2}/research", headers=ip2)
+        d2 = await c.post(f"/api/projects/{ap2}/research", headers=ip2)
+        check("anon: duplicate/simultaneous request blocked", d1.status_code == 200 and d2.status_code == 429)
+
+        # rapid-fire guard (fresh IP)
+        os.environ["KHOVA_ANON_DEDUP_SEC"] = "0"; os.environ["KHOVA_ANON_MIN_INTERVAL_SEC"] = "5"
+        ip3 = {"X-Forwarded-For": "203.0.113.30"}
+        ap3 = (await c.post("/api/projects", json={"title": "Anon3"})).json()["id"]; project_ids.append(ap3)
+        f1 = await c.post(f"/api/projects/{ap3}/research", headers=ip3)
+        f2 = await c.post(f"/api/projects/{ap3}/research", headers=ip3)
+        check("anon: rapid-fire request blocked (too_fast)", f1.status_code == 200 and f2.status_code == 429)
+        # reset limits to defaults for the remainder
+        os.environ["KHOVA_ANON_MIN_INTERVAL_SEC"] = "0"; os.environ["KHOVA_ANON_MAX_AI"] = "8"
+        for ip in ("203.0.113.10", "203.0.113.20", "203.0.113.30"):
+            await db.anon_ai_usage.delete_many({"ip": ip}); await db.anon_blocks.delete_many({"ip": ip})
+
+        # ---- Product bundle download (Priority 3) ----
+        bpid = f"prj_bundle_{uuid.uuid4().hex[:8]}"; project_ids.append(bpid)
+        bdir = GENERATED_DIR / bpid; bdir.mkdir(parents=True, exist_ok=True)
+        (bdir / "book.pdf").write_bytes(b"%PDF-1.4 fake ebook")
+        (bdir / "bonus1.xlsx").write_bytes(b"XLSX-BONUS-1")
+        (bdir / "bonus2.xlsx").write_bytes(b"XLSX-BONUS-2")
+        MIME_X = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        bassets = [
+            {"id": "a1", "type": "pdf", "key": "ebook_pdf", "filename": "book.pdf", "mime": "application/pdf", "path": str(bdir / "book.pdf"), "size": 19},
+            {"id": "a2", "type": "bonus", "key": "bonus_0", "filename": "tracker.xlsx", "mime": MIME_X, "path": str(bdir / "bonus1.xlsx"), "size": 12},
+            {"id": "a3", "type": "bonus", "key": "bonus_1", "filename": "tracker.xlsx", "mime": MIME_X, "path": str(bdir / "bonus2.xlsx"), "size": 12},
+            {"id": "a4", "type": "pdf", "key": "missing", "filename": "missing.pdf", "mime": "application/pdf", "path": str(bdir / "nope.pdf"), "size": 0},
+        ]
+        await db.projects.insert_one({"id": bpid, "user_id": uid, "title": "Bundle Book", "assets": bassets,
+                                      "created_at": billing.now_iso(), "updated_at": billing.now_iso()})
+        bresp = await c.get(f"/api/projects/{bpid}/bundle", headers=uh)
+        check("bundle: 200 + application/zip", bresp.status_code == 200 and bresp.headers.get("content-type") == "application/zip")
+        zf = zipfile.ZipFile(io.BytesIO(bresp.content))
+        znames = zf.namelist()
+        check("bundle: PDF included at root", "book.pdf" in znames)
+        check("bundle: bonus XLSX included under bonuses/", sum(1 for n in znames if n.startswith("bonuses/")) == 2)
+        check("bundle: duplicate filenames de-collided", len(set(znames)) == len(znames))
+        check("bundle: missing file skipped gracefully (3 files)", "missing.pdf" not in znames and len(znames) == 3)
+        check("bundle: zip contents are real bytes", zf.read("book.pdf") == b"%PDF-1.4 fake ebook")
+
+        oemail = f"other_{uuid.uuid4().hex[:6]}@example.com"
+        oh = await login(c, oemail, "Other")
+        oid = (await db.users.find_one({"email": oemail}))["user_id"]; user_ids.append(oid)
+        unauth = await c.get(f"/api/projects/{bpid}/bundle", headers=oh)
+        check("bundle: another user is blocked (403)", unauth.status_code == 403)
+
+        epid2 = f"prj_empty_{uuid.uuid4().hex[:8]}"; project_ids.append(epid2)
+        await db.projects.insert_one({"id": epid2, "user_id": uid, "title": "Empty", "assets": [],
+                                      "created_at": billing.now_iso(), "updated_at": billing.now_iso()})
+        emptyresp = await c.get(f"/api/projects/{epid2}/bundle", headers=uh)
+        check("bundle: no downloadable assets -> 400", emptyresp.status_code == 400)
+
+        # ---- Website theme (deterministic, no AI) (Priority 5) ----
+        st = await c.patch(f"/api/projects/{pid}/website/style", headers=uh, json={"style": "Editorial"})
+        check("website theme change 200 (deterministic)", st.status_code == 200)
+        webnow = st.json()["website"]
+        check("website theme persisted", webnow.get("style") == "Editorial")
+        check("website theme rebuilds draft preview", bool(webnow.get("draft_html")))
+        check("website theme keeps canonical palette", "#0B6E6B" in (webnow.get("draft_html") or ""))
+        bad = await c.patch(f"/api/projects/{pid}/website/style", headers=uh, json={"style": "Rainbow"})
+        check("website theme: invalid preset rejected (400)", bad.status_code == 400)
+        # all 5 presets render deterministically with palette preserved
+        import exporters as _exp
+        _spec = webnow.get("spec")
+        _pal = {"primary": "#0B6E6B"}
+        check("website: all 5 presets render + palette canonical",
+              all("#0B6E6B" in _exp.build_website_html(_spec, _pal, s, "id") for s in ["Minimal", "Modern", "Premium", "Editorial", "Bold"]))
+
+        # ---- Usage insights (own data only) (Priority 6) ----
+        usremail = f"usage_{uuid.uuid4().hex[:6]}@example.com"
+        ush = await login(c, usremail, "UsageUser")
+        usrid = (await db.users.find_one({"email": usremail}))["user_id"]; user_ids.append(usrid)
+        up1 = f"prj_usage_{uuid.uuid4().hex[:6]}"; up2 = f"prj_usage_{uuid.uuid4().hex[:6]}"; project_ids += [up1, up2]
+        await db.projects.insert_one({"id": up1, "user_id": usrid, "title": "Usage A", "format": "ebook", "assets": [], "created_at": billing.now_iso(), "updated_at": billing.now_iso()})
+        await db.projects.insert_one({"id": up2, "user_id": usrid, "title": "Usage B", "format": "website", "assets": [], "created_at": billing.now_iso(), "updated_at": billing.now_iso()})
+
+        async def _mkjob(u, p, charged):
+            await db.generation_jobs.insert_one({"id": f"job_{uuid.uuid4().hex[:10]}", "user_id": u, "project_id": p,
+                                                 "task": "ebook_section", "status": "completed", "credits_charged": charged,
+                                                 "created_at": billing.now_iso()})
+        await _mkjob(usrid, up1, 2); await _mkjob(usrid, up1, 2); await _mkjob(usrid, up2, 3)
+        await _mkjob(oid, up1, 99)  # another user's job on the same project MUST NOT leak
+        usage = (await c.get("/api/me/usage", headers=ush)).json()
+        check("usage: total credits used = own only (7)", usage["total_credits_used"] == 7)
+        check("usage: product_generations counts own products (2)", usage["product_generations"] == 2)
+        _per = {p["project_id"]: p for p in usage["products"]}
+        check("usage: per-product A credits = 4", _per.get(up1, {}).get("credits_used") == 4)
+        check("usage: per-product B credits = 3", _per.get(up2, {}).get("credits_used") == 3)
+        check("usage: other user's 99 credits not leaked", all(x["credits_used"] != 99 for x in usage["products"]))
+        # scoping: another user cannot see this user's usage
+        other_usage = (await c.get("/api/me/usage", headers=oh)).json()
+        check("usage: scoped per-user (other user sees own only)", up1 not in {p["project_id"] for p in other_usage["products"]} or other_usage["total_credits_used"] == 99)
+
     # ---- direct module tests: credits / jobs / limits ----
     print("\n[module-level economy/jobs]")
     tuid = f"user_mod_{uuid.uuid4().hex[:8]}"
@@ -323,6 +474,24 @@ async def main():
         check("insufficient credits blocks begin", False)
     except jobs.InsufficientCredits:
         check("insufficient credits blocks begin", True)
+
+    # ---- refund on charged-then-failed job (Priority 4) ----
+    await db.users.update_one({"user_id": tuid}, {"$set": {"credits": 20}})
+    fake_job = {"id": f"job_{uuid.uuid4().hex[:10]}", "user_id": tuid, "task": "ebook_section",
+                "credits_charged": 5, "status": "completed"}
+    await db.generation_jobs.insert_one(dict(fake_job))
+    refunded = await jobs.fail(fake_job, "boom")
+    check("refund: charged job refunds its credits", refunded == 5)
+    check("refund: balance restored (+5 => 25)", (await billing.get_balance(tuid)) == 25)
+    check("refund: job flagged credits_refunded / zeroed charge",
+          fake_job.get("credits_refunded") == 5 and fake_job.get("credits_charged") == 0)
+    # a failure that never charged must not refund (no false refund)
+    fake_job2 = {"id": f"job_{uuid.uuid4().hex[:10]}", "user_id": tuid, "task": "positioning",
+                 "credits_charged": 0, "status": "running"}
+    await db.generation_jobs.insert_one(dict(fake_job2))
+    refunded2 = await jobs.fail(fake_job2, "boom")
+    check("refund: no-charge failure refunds 0 (no false refund)",
+          refunded2 == 0 and (await billing.get_balance(tuid)) == 25)
 
     await cleanup(user_ids, project_ids)
 

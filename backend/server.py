@@ -1,13 +1,15 @@
 """Khova AI — FastAPI backend. AI digital product factory pipeline."""
 import os
+import io
 import uuid
+import zipfile
 import logging
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional, List, Dict, Any
 
 from fastapi import FastAPI, APIRouter, HTTPException, Request, Depends, UploadFile, File
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse, Response
 from starlette.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
@@ -18,6 +20,7 @@ import exporters
 import billing
 import jobs
 import model_router
+import ratelimit
 from llm_service import DEFAULT_MODELS, generate_image
 from agents import build_cover_prompt
 
@@ -59,17 +62,28 @@ def _job_http(exc):
     raise exc
 
 
-async def run_ai(user: Optional[dict], proj: dict, task: str, coro_factory):
+async def run_ai(user: Optional[dict], proj: dict, task: str, coro_factory, request: Optional[Request] = None):
     """Run an AI generation inside a tracked job.
 
     - Authenticated: full entitlement + credit check (reserve → charge on success),
       duplicate/retry protection, usage logging.
-    - Anonymous (deferred-auth funnel steps): runs free but still logs a usage job.
+    - Anonymous (deferred-auth funnel steps): server-side IP rate-limited
+      (see ratelimit.py), runs free but still logs a usage job.
 
     Returns (result, meta) where meta = {credits, charged, counted_creation} or {}.
     """
     if not user:
-        # Anonymous funnel step: log usage, no charge.
+        # Anonymous funnel step: enforce server-side rate limit FIRST (cost/abuse).
+        if request is not None:
+            try:
+                await ratelimit.enforce_anon(request, task, proj["id"])
+            except ratelimit.AnonRateLimited as e:
+                status = 429
+                raise HTTPException(status_code=status, detail={
+                    "message": e.message, "code": f"anon_{e.reason}",
+                    "retry_after": e.retry_after, "anon_limited": True,
+                })
+        # log usage, no charge.
         routing = model_router.route(task)
         rec = {
             "id": f"job_{uuid.uuid4().hex[:12]}", "user_id": None, "project_id": proj["id"],
@@ -85,7 +99,10 @@ async def run_ai(user: Optional[dict], proj: dict, task: str, coro_factory):
             await jobs.fail(rec, "http_error"); raise
         except Exception as e:
             await jobs.fail(rec, str(e))
-            raise HTTPException(status_code=502, detail=f"Generation failed: {e}")
+            raise HTTPException(status_code=502, detail={
+                "message": f"Generation failed: {e}", "code": "generation_failed",
+                "refunded": 0, "balance": None,
+            })
         await db.generation_jobs.update_one({"id": rec["id"]}, {"$set": {"status": "completed", "completed_at": now_iso()}})
         return result, {}
 
@@ -100,8 +117,17 @@ async def run_ai(user: Optional[dict], proj: dict, task: str, coro_factory):
     except HTTPException:
         await jobs.fail(job, "http_error"); raise
     except Exception as e:
-        await jobs.fail(job, str(e))
-        raise HTTPException(status_code=502, detail=f"Generation failed: {e}")
+        # Credits are charged on success only, so a pre-completion failure has not
+        # charged anything (refunded=0). If a charge had occurred, jobs.fail refunds it.
+        refunded = await jobs.fail(job, str(e))
+        try:
+            balance = await billing.get_balance(user["user_id"])
+        except Exception:
+            balance = None
+        raise HTTPException(status_code=502, detail={
+            "message": f"Generation failed: {e}", "code": "generation_failed",
+            "refunded": refunded, "balance": balance,
+        })
 
     try:
         info = await jobs.complete(user, proj, job)
@@ -250,6 +276,64 @@ async def put_settings(body: SettingsBody, user: Optional[dict] = Depends(get_op
 async def my_economy(user: dict = Depends(get_current_user)):
     user = await billing.ensure_user_economy(user)
     return billing.economy_view(user)
+
+
+@api.get("/me/usage")
+async def my_usage(user: dict = Depends(get_current_user)):
+    """The authenticated user's OWN usage insights (deterministic, no AI).
+
+    Scoped strictly to this user_id — a user can never see another user's data.
+    Aggregates the existing server-side generation-job records."""
+    user = await billing.ensure_user_economy(user)
+    uid = user["user_id"]
+
+    per_project = {}       # project_id -> {credits_used, generations}
+    total_used = 0
+    total_generations = 0
+    total_refunded = 0
+    async for j in db.generation_jobs.find(
+        {"user_id": uid, "status": "completed"},
+        {"_id": 0, "project_id": 1, "credits_charged": 1, "task": 1},
+    ):
+        charged = int(j.get("credits_charged") or 0)
+        pid = j.get("project_id") or "unknown"
+        slot = per_project.setdefault(pid, {"credits_used": 0, "generations": 0})
+        slot["credits_used"] += charged
+        slot["generations"] += 1
+        total_used += charged
+        total_generations += 1
+    async for j in db.generation_jobs.find(
+        {"user_id": uid, "credits_refunded": {"$gt": 0}}, {"_id": 0, "credits_refunded": 1},
+    ):
+        total_refunded += int(j.get("credits_refunded") or 0)
+
+    # Attach titles (only this user's projects).
+    titles = {}
+    async for p in db.projects.find({"user_id": uid}, {"_id": 0, "id": 1, "title": 1, "format": 1}):
+        titles[p["id"]] = {"title": p.get("title") or "Untitled", "format": p.get("format")}
+
+    products = []
+    for pid, agg in per_project.items():
+        meta = titles.get(pid, {})
+        products.append({
+            "project_id": pid,
+            "title": meta.get("title", "Untitled"),
+            "format": meta.get("format"),
+            "credits_used": agg["credits_used"],
+            "generations": agg["generations"],
+        })
+    products.sort(key=lambda x: (-x["credits_used"], x["title"].lower()))
+
+    eco = billing.economy_view(user)
+    return {
+        "credits_remaining": eco["credits"],
+        "plan": eco["plan"],
+        "total_credits_used": total_used,
+        "total_credits_refunded": total_refunded,
+        "total_generations": total_generations,
+        "product_generations": len(products),
+        "products": products,
+    }
 
 
 class RedeemBody(BaseModel):
@@ -499,14 +583,14 @@ async def save_discover(project_id: str, body: DiscoverBody, user: Optional[dict
 
 
 @api.post("/projects/{project_id}/research")
-async def run_research(project_id: str, user: Optional[dict] = Depends(get_optional_user)):
+async def run_research(project_id: str, request: Request, user: Optional[dict] = Depends(get_optional_user)):
     proj = await load_project(project_id)
     check_access(proj, user)
     async def _do():
         b = await agents.run_market_research(proj.get("discover", {}), proj.get("product_language", "id"), {})
         b["generated_at"] = now_iso()
         return b
-    bundle, meta = await run_ai(user, proj, "research", _do)
+    bundle, meta = await run_ai(user, proj, "research", _do, request=request)
     await save_project(project_id, {"research": bundle, "current_step": "opportunities"})
     proj["research"] = bundle
     proj["current_step"] = "opportunities"
@@ -514,14 +598,14 @@ async def run_research(project_id: str, user: Optional[dict] = Depends(get_optio
 
 
 @api.post("/projects/{project_id}/opportunities")
-async def gen_opportunities(project_id: str, user: Optional[dict] = Depends(get_optional_user)):
+async def gen_opportunities(project_id: str, request: Request, user: Optional[dict] = Depends(get_optional_user)):
     proj = await load_project(project_id)
     check_access(proj, user)
     if not proj.get("research"):
         raise HTTPException(status_code=400, detail="Run market research first")
     async def _do():
         return await agents.generate_opportunities(proj.get("discover", {}), proj["research"], proj.get("product_language", "id"), {})
-    opps, meta = await run_ai(user, proj, "opportunities", _do)
+    opps, meta = await run_ai(user, proj, "opportunities", _do, request=request)
     await save_project(project_id, {"opportunities": opps, "current_step": "opportunities"})
     proj["opportunities"] = opps
     return _with_economy(serialize_doc(proj), meta)
@@ -565,7 +649,7 @@ def _selected_opp(proj):
 
 
 @api.post("/projects/{project_id}/positioning")
-async def gen_positioning(project_id: str, user: Optional[dict] = Depends(get_optional_user)):
+async def gen_positioning(project_id: str, request: Request, user: Optional[dict] = Depends(get_optional_user)):
     proj = await load_project(project_id)
     check_access(proj, user)
     opp = _selected_opp(proj)
@@ -573,7 +657,7 @@ async def gen_positioning(project_id: str, user: Optional[dict] = Depends(get_op
         raise HTTPException(status_code=400, detail="Select an opportunity first")
     async def _do():
         return await agents.generate_positioning(opp, proj.get("discover", {}), proj.get("product_language", "id"), {})
-    pos, meta = await run_ai(user, proj, "positioning", _do)
+    pos, meta = await run_ai(user, proj, "positioning", _do, request=request)
     await save_project(project_id, {"positioning": pos, "current_step": "transformation"})
     proj["positioning"] = pos
     proj["current_step"] = "transformation"
@@ -581,7 +665,7 @@ async def gen_positioning(project_id: str, user: Optional[dict] = Depends(get_op
 
 
 @api.post("/projects/{project_id}/transformation")
-async def gen_transformation(project_id: str, user: Optional[dict] = Depends(get_optional_user)):
+async def gen_transformation(project_id: str, request: Request, user: Optional[dict] = Depends(get_optional_user)):
     proj = await load_project(project_id)
     check_access(proj, user)
     opp = _selected_opp(proj)
@@ -589,7 +673,7 @@ async def gen_transformation(project_id: str, user: Optional[dict] = Depends(get
         raise HTTPException(status_code=400, detail="Positioning required first")
     async def _do():
         return await agents.generate_transformation(opp, proj["positioning"], proj.get("product_language", "id"), {})
-    tr, meta = await run_ai(user, proj, "transformation", _do)
+    tr, meta = await run_ai(user, proj, "transformation", _do, request=request)
     # keep existing palette if set
     existing_palette = (proj.get("transformation") or {}).get("palette") if proj.get("transformation") else None
     tr["palette"] = existing_palette or {
@@ -1048,6 +1132,34 @@ async def website_unpublish(project_id: str, user: dict = Depends(get_current_us
     return serialize_doc(proj)
 
 
+class WebsiteStyleChangeBody(BaseModel):
+    style: str
+
+
+@api.patch("/projects/{project_id}/website/style")
+async def website_set_style(project_id: str, body: WebsiteStyleChangeBody, user: dict = Depends(get_current_user)):
+    """Apply a website visual THEME/preset deterministically (NO AI, NO credits).
+
+    Only changes typography/spacing/radius/button treatment via the preset. The
+    canonical product palette remains the source of truth for colors and is NOT
+    replaced. Rebuilds the draft preview; the published snapshot is untouched
+    until the user re-publishes."""
+    proj = await load_project(project_id)
+    check_access(proj, user)
+    style = (body.style or "Modern")
+    if style not in exporters.STYLE_PRESETS:
+        raise HTTPException(status_code=400, detail="Unknown website theme")
+    web = _web_defaults(proj.get("website"))
+    if not web.get("spec"):
+        raise HTTPException(status_code=400, detail="Generate the website spec first")
+    web["style"] = style
+    palette = (proj.get("transformation") or {}).get("palette", {})
+    web["draft_html"] = exporters.build_website_html(web["spec"], palette, style, proj.get("product_language", "id"))
+    await save_project(project_id, {"website": web})
+    proj["website"] = web
+    return serialize_doc(proj)
+
+
 # ----- QA -----
 class QABody(BaseModel):
     format: Optional[str] = None
@@ -1269,6 +1381,80 @@ async def ebook_bonus_generate(project_id: str, index: int, user: dict = Depends
 # ---------------------------------------------------------------------------
 # Assets / downloads / website serving
 # ---------------------------------------------------------------------------
+# Asset types that belong in a downloadable product bundle, with folder names.
+BUNDLE_ASSET_TYPES = {
+    "pdf": "",            # main deliverable (ebook PDF) at root
+    "xlsx": "",           # spreadsheet product at root
+    "html": "website",    # website export
+    "bonus": "bonuses",   # generated bonus XLSX files
+}
+
+
+def _safe_zip_name(existing: set, folder: str, filename: str) -> str:
+    """Return a unique, path-safe name inside the zip (dedups collisions)."""
+    filename = (filename or "file").replace("\\", "/").split("/")[-1] or "file"
+    base = f"{folder}/{filename}" if folder else filename
+    if base not in existing:
+        existing.add(base)
+        return base
+    stem, dot, ext = filename.rpartition(".")
+    i = 2
+    while True:
+        alt_name = f"{stem}_{i}.{ext}" if dot else f"{filename}_{i}"
+        alt = f"{folder}/{alt_name}" if folder else alt_name
+        if alt not in existing:
+            existing.add(alt)
+            return alt
+        i += 1
+
+
+@api.get("/projects/{project_id}/bundle")
+async def download_bundle(project_id: str, user: dict = Depends(get_current_user)):
+    """One-click 'Download Product Bundle' — packages all real downloadable
+    assets of a product into a single ZIP, deterministically (NO AI).
+
+    Ownership is enforced server-side: only the project owner (or admin) can
+    download. Missing files are skipped gracefully; duplicate filenames are
+    de-collided. Returns a real, usable ZIP."""
+    proj = await load_project(project_id)
+    # Ownership: owned projects require the owner; anonymous (unclaimed) projects
+    # have no assets worth bundling (generation always claims), but guard anyway.
+    owner = proj.get("user_id")
+    if owner and owner != user["user_id"] and user.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="You don't have access to this product's files.")
+
+    assets = proj.get("assets", []) or []
+    included, used_names = [], set()
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        for a in assets:
+            atype = a.get("type")
+            if atype not in BUNDLE_ASSET_TYPES:
+                continue
+            p = Path(a.get("path", ""))
+            if not p.exists():
+                continue  # missing file — skip gracefully
+            try:
+                data = p.read_bytes()
+            except Exception:
+                continue
+            name = _safe_zip_name(used_names, BUNDLE_ASSET_TYPES[atype], a.get("filename"))
+            zf.writestr(name, data)
+            included.append({"type": atype, "name": name, "size": len(data)})
+
+    if not included:
+        raise HTTPException(status_code=400, detail="No downloadable assets yet. Generate and export your product first.")
+
+    zip_bytes = buf.getvalue()
+    title = proj.get("title") or "product"
+    safe = "".join([c if c.isalnum() else "_" for c in str(title)])[:40] or "product"
+    headers = {
+        "Content-Disposition": f'attachment; filename="{safe}_bundle.zip"',
+        "X-Bundle-Files": str(len(included)),
+    }
+    return Response(content=zip_bytes, media_type="application/zip", headers=headers)
+
+
 @api.get("/projects/{project_id}/assets/{asset_id}/download")
 async def download_asset(project_id: str, asset_id: str, user: Optional[dict] = Depends(get_optional_user)):
     proj = await load_project(project_id)
@@ -1331,6 +1517,11 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.on_event("startup")
+async def _startup_indexes():
+    await ratelimit.ensure_indexes()
 
 
 @app.on_event("shutdown")

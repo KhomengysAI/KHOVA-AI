@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useLang } from '@/lib/i18n';
-import { websiteSpec, websiteBuild, websiteRegenSection, websitePublish, websiteUnpublish, siteUrl, sitePreviewUrl, downloadUrl } from '@/lib/api';
-import { afterGeneration, creditDescription } from '@/lib/economy';
+import { websiteSpec, websiteBuild, websiteRegenSection, websitePublish, websiteUnpublish, websiteSetStyle, siteUrl, sitePreviewUrl, downloadUrl } from '@/lib/api';
+import { afterGeneration, creditDescription, generationErrorMessage } from '@/lib/economy';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -29,13 +29,23 @@ export default function WebsiteCreator({ project, setProject, goTo, ensureAuth }
   const [building, setBuilding] = useState(false);
   const [regenSection, setRegenSection] = useState('hero');
   const [device, setDevice] = useState('desktop');
+  const [previewNonce, setPreviewNonce] = useState(0);
   const web = project.website;
   const status = web?.status || 'draft';
   const isPublished = status === 'published';
 
-  const doSpec = () => { if (!ensureAuth(doSpec)) return; (async () => { setBusy(true); try { const p = await websiteSpec(project.id, style); setProject(p); toast.success('Website content generated', { description: creditDescription(p, t) }); afterGeneration(p, t); } catch (e) { toast.error(e?.response?.data?.detail || 'Failed.'); } finally { setBusy(false); } })(); };
-  const doBuild = () => { if (!ensureAuth(doBuild)) return; (async () => { setBuilding(true); try { const r = await websiteBuild(project.id); setProject(r.project); toast.success('Preview built'); } catch (e) { toast.error('Build failed.'); } finally { setBuilding(false); } })(); };
-  const doRegen = () => { if (!ensureAuth(doRegen)) return; (async () => { setBuilding(true); try { const p = await websiteRegenSection(project.id, regenSection); setProject(p); toast.success(`Section "${regenSection}" regenerated`, { description: creditDescription(p, t) }); afterGeneration(p, t); } catch (e) { toast.error(e?.response?.data?.detail || 'Failed.'); } finally { setBuilding(false); } })(); };
+  const doSpec = () => { if (!ensureAuth(doSpec)) return; (async () => { setBusy(true); try { const p = await websiteSpec(project.id, style); setProject(p); setPreviewNonce(n => n + 1); toast.success('Website content generated', { description: creditDescription(p, t) }); afterGeneration(p, t); } catch (e) { const m = generationErrorMessage(e, t, 'Failed.'); toast.error(m.message); } finally { setBusy(false); } })(); };
+  const doBuild = () => { if (!ensureAuth(doBuild)) return; (async () => { setBuilding(true); try { const r = await websiteBuild(project.id); setProject(r.project); setPreviewNonce(n => n + 1); toast.success('Preview built'); } catch (e) { toast.error('Build failed.'); } finally { setBuilding(false); } })(); };
+  const doRegen = () => { if (!ensureAuth(doRegen)) return; (async () => { setBuilding(true); try { const p = await websiteRegenSection(project.id, regenSection); setProject(p); setPreviewNonce(n => n + 1); toast.success(`Section "${regenSection}" regenerated`, { description: creditDescription(p, t) }); afterGeneration(p, t); } catch (e) { const m = generationErrorMessage(e, t, 'Failed.'); toast.error(m.message); } finally { setBuilding(false); } })(); };
+
+  // Apply a visual THEME deterministically (no AI, no credits). If there is no
+  // spec yet the choice is just remembered for the first generation.
+  const applyTheme = (newStyle) => {
+    setStyle(newStyle);
+    if (!web || !web.spec) return;
+    if (!ensureAuth(() => applyTheme(newStyle))) return;
+    (async () => { setBuilding(true); try { const p = await websiteSetStyle(project.id, newStyle); setProject(p); setPreviewNonce(n => n + 1); toast.success(t('theme.applied')); } catch (e) { toast.error(e?.response?.data?.detail || 'Failed.'); } finally { setBuilding(false); } })();
+  };
 
   const doPublish = () => { if (!ensureAuth(doPublish)) return; (async () => { setBuilding(true); try { const p = await websitePublish(project.id); setProject(p); toast.success(t('web.published.toast'), { action: { label: t('web.openpublic'), onClick: () => window.open(siteUrl(project.id), '_blank') } }); afterGeneration(p, t); } catch (e) { toast.error(e?.response?.data?.detail || t('web.publish.locked')); } finally { setBuilding(false); } })(); };
   const doUnpublish = () => { (async () => { setBuilding(true); try { const p = await websiteUnpublish(project.id); setProject(p); toast.success(t('web.unpublished.toast')); } catch (e) { toast.error('Failed.'); } finally { setBuilding(false); } })(); };
@@ -72,7 +82,7 @@ export default function WebsiteCreator({ project, setProject, goTo, ensureAuth }
           <Badge className={`uppercase text-[10px] ${STATUS_STYLE[status]}`} data-testid="website-status-badge">{t(`web.${status}`)}</Badge>
         </div>
         <div className="flex gap-2 flex-wrap">
-          <Select value={style} onValueChange={setStyle}><SelectTrigger className="w-32 h-9" data-testid="website-style-selector"><SelectValue /></SelectTrigger><SelectContent>{STYLES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent></Select>
+          <Select value={style} onValueChange={applyTheme}><SelectTrigger className="w-32 h-9" data-testid="website-style-selector"><SelectValue /></SelectTrigger><SelectContent>{STYLES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent></Select>
           <Button variant="secondary" size="sm" onClick={doSpec} className="gap-1"><RefreshCw className="w-3.5 h-3.5" /> {t('common.regenerate')}</Button>
           <Button size="sm" onClick={doBuild} disabled={building} data-testid="website-build-button">{building ? '...' : t('web.preview')}</Button>
           <Button size="sm" variant="secondary" onClick={() => goTo('qa')} className="gap-1">{t('common.continue')} <ArrowRight className="w-3.5 h-3.5" /></Button>
@@ -117,7 +127,7 @@ export default function WebsiteCreator({ project, setProject, goTo, ensureAuth }
             </div>
           </div>
           <div className="flex justify-center bg-secondary rounded-lg p-2">
-            <iframe title="website-preview" data-testid="website-preview-iframe" src={sitePreviewUrl(project.id)} className="bg-white rounded border border-border" style={{ width: device === 'mobile' ? 390 : '100%', height: 620 }} />
+            <iframe title="website-preview" data-testid="website-preview-iframe" key={previewNonce} src={`${sitePreviewUrl(project.id)}&t=${previewNonce}`} className="bg-white rounded border border-border" style={{ width: device === 'mobile' ? 390 : '100%', height: 620 }} />
           </div>
         </Card>
       ) : (

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useLang } from '@/lib/i18n';
 import { genBranding, setPalette } from '@/lib/api';
+import { generationErrorMessage } from '@/lib/economy';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -20,7 +21,7 @@ export default function BrandingStep({ project, setProject, goTo, ensureAuth }) 
   // source of truth propagated into cover/PDF/website/spreadsheet exports.
   const palette = (project.transformation && project.transformation.palette) || PALETTE_PRESETS[0].c;
 
-  const gen = () => { if (!ensureAuth(gen)) return; (async () => { setBusy(true); try { const p = await genBranding(project.id, style); setProject(p); toast.success(t('toast.brand.done')); } catch (e) { toast.error(e?.response?.data?.detail || 'Gagal.'); } finally { setBusy(false); } })(); };
+  const gen = () => { if (!ensureAuth(gen)) return; (async () => { setBusy(true); try { const p = await genBranding(project.id, style); setProject(p); toast.success(t('toast.brand.done')); } catch (e) { toast.error(generationErrorMessage(e, t, 'Gagal.').message); } finally { setBusy(false); } })(); };
   const savePalette = async (pal) => { const p = await setPalette(project.id, pal); setProject(p); };
 
   if (busy) return <Working label="Menyusun branding..." />;

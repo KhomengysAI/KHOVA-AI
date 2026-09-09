@@ -1,16 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { useLang } from '@/lib/i18n';
-import { ebookExport, spreadsheetBuild, websiteBuild, ebookDesignCheck, downloadUrl, siteUrl, ebookPreviewUrl } from '@/lib/api';
+import { ebookExport, spreadsheetBuild, websiteBuild, ebookDesignCheck, downloadUrl, siteUrl, ebookPreviewUrl, fetchBundle } from '@/lib/api';
+import { generationErrorMessage } from '@/lib/economy';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Working } from '@/components/Loading';
-import { Download, FileText, Table2, Globe, ExternalLink, CheckCircle2, Eye, Sparkles } from 'lucide-react';
+import { Download, FileText, Table2, Globe, ExternalLink, CheckCircle2, Eye, Sparkles, Package } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function ExportStep({ project, setProject, ensureAuth }) {
   const { t } = useLang();
   const [busy, setBusy] = useState(false);
+  const [bundling, setBundling] = useState(false);
   const [check, setCheck] = useState(null);
   const fmt = project.format;
 
@@ -18,10 +20,36 @@ export default function ExportStep({ project, setProject, ensureAuth }) {
 
   const assetOf = (type) => (project.assets || []).find(a => a.type === type);
   const pdf = assetOf('pdf'), xlsx = assetOf('xlsx'), html = assetOf('html');
+  const hasAssets = (project.assets || []).length > 0;
 
-  const exportEbook = () => { if (!ensureAuth(exportEbook)) return; (async () => { setBusy(true); try { const r = await ebookExport(project.id); setProject(r.project); toast.success(t('toast.export.pdf')); } catch (e) { toast.error(e?.response?.data?.detail || 'Gagal ekspor PDF.'); } finally { setBusy(false); } })(); };
-  const buildXlsx = () => { if (!ensureAuth(buildXlsx)) return; (async () => { setBusy(true); try { const r = await spreadsheetBuild(project.id); setProject(r.project); toast.success(t('toast.export.xlsx')); } catch (e) { toast.error('Gagal.'); } finally { setBusy(false); } })(); };
+  const exportEbook = () => { if (!ensureAuth(exportEbook)) return; (async () => { setBusy(true); try { const r = await ebookExport(project.id); setProject(r.project); toast.success(t('toast.export.pdf')); } catch (e) { const m = generationErrorMessage(e, t, 'Gagal ekspor PDF.'); toast.error(m.message); } finally { setBusy(false); } })(); };
+  const buildXlsx = () => { if (!ensureAuth(buildXlsx)) return; (async () => { setBusy(true); try { const r = await spreadsheetBuild(project.id); setProject(r.project); toast.success(t('toast.export.xlsx')); } catch (e) { const m = generationErrorMessage(e, t, 'Gagal.'); toast.error(m.message); } finally { setBusy(false); } })(); };
   const buildSite = () => { if (!ensureAuth(buildSite)) return; (async () => { setBusy(true); try { const r = await websiteBuild(project.id); setProject(r.project); toast.success(t('toast.export.site'), { action: { label: t('common.preview'), onClick: () => window.open(siteUrl(project.id), '_blank') } }); } catch (e) { toast.error('Gagal.'); } finally { setBusy(false); } })(); };
+
+  const downloadBundle = () => {
+    if (!ensureAuth(downloadBundle)) return;
+    (async () => {
+      setBundling(true);
+      try {
+        const resp = await fetchBundle(project.id);
+        const blob = new Blob([resp.data], { type: 'application/zip' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        const safe = (project.title || 'product').replace(/[^a-zA-Z0-9]/g, '_').slice(0, 40) || 'product';
+        a.href = url; a.download = `${safe}_bundle.zip`;
+        document.body.appendChild(a); a.click(); a.remove();
+        window.URL.revokeObjectURL(url);
+        toast.success(t('bundle.ready'));
+      } catch (e) {
+        let msg = t('bundle.failed');
+        try {
+          if (e?.response?.status === 400) msg = t('bundle.empty');
+          else if (e?.response?.data && typeof e.response.data.detail === 'string') msg = e.response.data.detail;
+        } catch (_) { /* noop */ }
+        toast.error(msg);
+      } finally { setBundling(false); }
+    })();
+  };
 
   if (busy) return <Working label="Menyiapkan aset final..." sub="Merender dokumen dengan design system Anda." />;
 
@@ -71,8 +99,13 @@ export default function ExportStep({ project, setProject, ensureAuth }) {
       )}
 
       <Card className="p-5 bg-secondary">
-        <div className="text-sm font-medium mb-3">Semua aset</div>
-        {(project.assets || []).length === 0 && <p className="text-sm text-muted-foreground">Belum ada aset.</p>}
+        <div className="flex items-center justify-between gap-3 mb-3 flex-wrap">
+          <div className="text-sm font-medium">Semua aset</div>
+          <Button size="sm" onClick={downloadBundle} disabled={!hasAssets || bundling} className="gap-1.5" data-testid="download-bundle-button">
+            <Package className="w-4 h-4" /> {bundling ? t('bundle.downloading') : t('bundle.download')}
+          </Button>
+        </div>
+        {!hasAssets && <p className="text-sm text-muted-foreground">Belum ada aset.</p>}
         <div className="space-y-2">
           {(project.assets || []).map(a => (
             <div key={a.id} className="flex items-center justify-between bg-card rounded-lg p-3 border border-border">

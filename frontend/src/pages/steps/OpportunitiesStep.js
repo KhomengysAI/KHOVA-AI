@@ -1,6 +1,8 @@
 import React, { useState, useMemo } from 'react';
 import { useLang } from '@/lib/i18n';
 import { genOpportunities, toggleSaveOpp, selectOpportunity } from '@/lib/api';
+import { useAuth } from '@/context/AuthContext';
+import { isAnonLimit } from '@/lib/economy';
 import { OpportunityCard } from '@/components/OpportunityCard';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -41,6 +43,7 @@ const ScoringHelpDialog = () => {
 
 export default function OpportunitiesStep({ project, setProject, goTo }) {
   const { t } = useLang();
+  const { setShowLogin } = useAuth();
   const [busy, setBusy] = useState(false);
   const [sort, setSort] = useState('overall');
   const [filter, setFilter] = useState('all');
@@ -50,7 +53,10 @@ export default function OpportunitiesStep({ project, setProject, goTo }) {
   const gen = async () => {
     setBusy(true);
     try { const p = await genOpportunities(project.id); setProject(p); toast.success(t('toast.opp.done', { n: (p.opportunities || []).length })); }
-    catch (e) { toast.error('Gagal membuat peluang. Coba lagi.'); }
+    catch (e) {
+      if (isAnonLimit(e)) { toast.error(e?.response?.data?.detail || t('gen.failed')); setShowLogin && setShowLogin(true); }
+      else toast.error(e?.response?.data?.detail || 'Gagal membuat peluang. Coba lagi.');
+    }
     finally { setBusy(false); }
   };
 
