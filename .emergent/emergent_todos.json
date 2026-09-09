@@ -1,30 +1,38 @@
 [
   {
-    "content": "Phase 2: ebook plan/section/rewrite math+productization prompts",
+    "content": "Phase A1: Fix language bug - deterministic per-product-language block headings in agents.py",
     "status": "completed"
   },
   {
-    "content": "Phase 2: bonus asset spec + XLSX generation endpoint",
+    "content": "Phase A2: Remove AI Preferences UI from Settings.js (keep backend routing internal)",
     "status": "completed"
   },
   {
-    "content": "Phase 2: exporters.py editorial CSS overhaul + math notation + cover redesign",
+    "content": "Phase A3: Dark Mode - ThemeContext + toggle in Settings + AppShell quick toggle",
     "status": "completed"
   },
   {
-    "content": "Phase 2: frontend bonus/illustration UI wiring",
+    "content": "Phase B: Backend economy (billing/jobs/model_router/auth) + wiring + admin/redeem/economy routes",
     "status": "completed"
   },
   {
-    "content": "Phase 2: real end-to-end PDF visual QA (found & fixed inline-flex fraction bug)",
+    "content": "Phase C10: Website DRAFT/PREVIEW/PUBLISHED, publish/unpublish, regenerate section, public URL",
     "status": "completed"
   },
   {
-    "content": "Run testing_agent_v3 regression",
+    "content": "Phase D11: QA apply-issue (section-level targeted improvement + mark resolved + versions)",
     "status": "completed"
   },
   {
-    "content": "Verify testing agent's '/projects redirect' report -> confirmed false positive (cross-user ownership, not a bug); live-verified EbookCreator bonus button end-to-end in browser",
+    "content": "Phase E12/13: Frontend credits/plan badge, Redeem UI, Admin page, action feedback",
+    "status": "completed"
+  },
+  {
+    "content": "Phase F14: Lightweight mocked backend tests (48 passed) + credit-safe UI validation (100%) + real-AI smoke test",
+    "status": "completed"
+  },
+  {
+    "content": "Phase G: Final implementation report",
     "status": "completed"
   }
 ]

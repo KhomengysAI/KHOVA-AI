@@ -5,6 +5,17 @@ export const API_BASE = `${BACKEND_URL}/api`;
 
 const api = axios.create({ baseURL: API_BASE, withCredentials: true, timeout: 240000 });
 
+// Auto-refresh the credits pill whenever a response carries economy info.
+api.interceptors.response.use((resp) => {
+  try {
+    const d = resp && resp.data;
+    if (d && (d._economy || d.public_url || d._applied)) {
+      window.dispatchEvent(new Event('khova:economy'));
+    }
+  } catch (e) { /* noop */ }
+  return resp;
+});
+
 export const apiRaw = api;
 
 // --- auth ---
@@ -14,9 +25,20 @@ export const devLogin = (email, name) => api.post('/auth/dev-login', { email, na
 export const logoutApi = () => api.post('/auth/logout').then(r => r.data);
 
 // --- config / settings ---
-export const getModelConfig = () => api.get('/config/models').then(r => r.data);
 export const getSettings = () => api.get('/settings').then(r => r.data);
 export const putSettings = (body) => api.put('/settings', body).then(r => r.data);
+
+// --- economy (plan / credits / usage) ---
+export const getEconomy = () => api.get('/me/economy').then(r => r.data);
+export const redeemCode = (code) => api.post('/redeem', { code }).then(r => r.data);
+
+// --- admin ---
+export const adminOverview = () => api.get('/admin/overview').then(r => r.data);
+export const adminListUsers = () => api.get('/admin/users').then(r => r.data);
+export const adminListJobs = () => api.get('/admin/jobs').then(r => r.data);
+export const adminListCodes = () => api.get('/admin/codes').then(r => r.data);
+export const adminCreateCode = (body) => api.post('/admin/codes', body).then(r => r.data);
+export const adminUpdateUser = (userId, body) => api.patch(`/admin/users/${userId}`, body).then(r => r.data);
 
 // --- projects ---
 export const createProject = (body) => api.post('/projects', body).then(r => r.data);
@@ -58,11 +80,16 @@ export const spreadsheetBuild = (id) => api.post(`/projects/${id}/spreadsheet/bu
 export const websiteSpec = (id, style) => api.post(`/projects/${id}/website/spec`, { style }).then(r => r.data);
 export const websiteBuild = (id) => api.post(`/projects/${id}/website/build`).then(r => r.data);
 export const websiteEdit = (id, spec) => api.patch(`/projects/${id}/website/spec`, { spec }).then(r => r.data);
+export const websiteRegenSection = (id, section, instruction) => api.post(`/projects/${id}/website/section/regenerate`, { section, instruction }).then(r => r.data);
+export const websitePublish = (id) => api.post(`/projects/${id}/website/publish`).then(r => r.data);
+export const websiteUnpublish = (id) => api.post(`/projects/${id}/website/unpublish`).then(r => r.data);
 export const siteUrl = (id) => `${API_BASE}/sites/${id}`;
+export const sitePreviewUrl = (id) => `${API_BASE}/sites/${id}?preview=1`;
 
 // --- qa / branding / bonuses ---
 export const runQA = (id) => api.post(`/projects/${id}/qa`, {}).then(r => r.data);
 export const applyQA = (id) => api.post(`/projects/${id}/qa/apply`).then(r => r.data);
+export const applyQAIssue = (id, issueId) => api.post(`/projects/${id}/qa/apply-issue/${issueId}`).then(r => r.data);
 export const genBranding = (id, style) => api.post(`/projects/${id}/branding`, { style }).then(r => r.data);
 export const genBonuses = (id) => api.post(`/projects/${id}/bonuses`).then(r => r.data);
 export const ebookBonusGenerate = (id, index) => api.post(`/projects/${id}/ebook/bonus/${index}/generate`).then(r => r.data);

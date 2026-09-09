@@ -3,6 +3,7 @@ import React from 'react';
 import { BrowserRouter, Routes, Route, useLocation, Navigate } from 'react-router-dom';
 import { Toaster } from '@/components/ui/sonner';
 import { LanguageProvider } from '@/lib/i18n';
+import { ThemeProvider } from '@/context/ThemeContext';
 import { AuthProvider, useAuth } from '@/context/AuthContext';
 import { AppShell } from '@/components/AppShell';
 import { LoginModal } from '@/components/LoginModal';
@@ -11,6 +12,7 @@ import AuthCallback from '@/pages/AuthCallback';
 import Dashboard from '@/pages/Dashboard';
 import Projects from '@/pages/Projects';
 import Settings from '@/pages/Settings';
+import Admin from '@/pages/Admin';
 import Wizard from '@/pages/Wizard';
 import NewProduct from '@/pages/NewProduct';
 
@@ -35,6 +37,7 @@ function AppRouter() {
         <Route path="/dashboard" element={<RequireAuth><Dashboard /></RequireAuth>} />
         <Route path="/projects" element={<RequireAuth><Projects /></RequireAuth>} />
         <Route path="/settings" element={<Settings />} />
+        <Route path="/admin" element={<RequireAuth><Admin /></RequireAuth>} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </AppShell>
@@ -44,15 +47,17 @@ function AppRouter() {
 function App() {
   return (
     <div className="App">
-      <LanguageProvider>
-        <AuthProvider>
-          <BrowserRouter>
-            <AppRouter />
-            <LoginModal />
-            <Toaster position="top-right" richColors />
-          </BrowserRouter>
-        </AuthProvider>
-      </LanguageProvider>
+      <ThemeProvider>
+        <LanguageProvider>
+          <AuthProvider>
+            <BrowserRouter>
+              <AppRouter />
+              <LoginModal />
+              <Toaster position="top-right" richColors />
+            </BrowserRouter>
+          </AuthProvider>
+        </LanguageProvider>
+      </ThemeProvider>
     </div>
   );
 }

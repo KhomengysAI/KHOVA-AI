@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useLang } from '@/lib/i18n';
-import { runQA, applyQA } from '@/lib/api';
+import { runQA, applyQA, applyQAIssue } from '@/lib/api';
+import { afterGeneration, creditDescription } from '@/lib/economy';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -15,17 +16,33 @@ export default function QAStep({ project, setProject, goTo, ensureAuth }) {
   const { t } = useLang();
   const [busy, setBusy] = useState(false);
   const [applying, setApplying] = useState(false);
+  const [applyingId, setApplyingId] = useState(null);
   const report = (project.qa || [])[0];
 
-  const run = () => { if (!ensureAuth(run)) return; (async () => { setBusy(true); try { const p = await runQA(project.id); setProject(p); toast.success(t('toast.qa.done', { n: p.qa?.[0]?.overall })); } catch (e) { toast.error(e?.response?.data?.detail || 'Gagal QA.'); } finally { setBusy(false); } })(); };
+  const run = () => { if (!ensureAuth(run)) return; (async () => { setBusy(true); try { const p = await runQA(project.id); setProject(p); toast.success(t('toast.qa.done', { n: p.qa?.[0]?.overall }), { description: creditDescription(p, t) }); afterGeneration(p, t); } catch (e) { toast.error(e?.response?.data?.detail || 'QA failed.'); } finally { setBusy(false); } })(); };
   const apply = async () => {
     setApplying(true);
     try {
       const p = await applyQA(project.id);
       setProject(p);
-      toast.success(t('toast.qa.apply.done'), { action: { label: t('toast.qa.apply.open'), onClick: () => goTo('create') } });
-    } catch (e) { toast.error(e?.response?.data?.detail || 'Gagal.'); }
+      toast.success(t('toast.qa.apply.done'), { description: creditDescription(p, t), action: { label: t('toast.qa.apply.open'), onClick: () => goTo('create') } });
+      afterGeneration(p, t);
+    } catch (e) { toast.error(e?.response?.data?.detail || 'Failed.'); }
     finally { setApplying(false); }
+  };
+  const applyOne = (iss) => {
+    if (!ensureAuth(() => applyOne(iss))) return;
+    setApplyingId(iss.id);
+    (async () => {
+      try {
+        const p = await applyQAIssue(project.id, iss.id);
+        setProject(p);
+        const target = p._applied?.target ? ` (${p._applied.target})` : '';
+        toast.success(`${t('qa.applied')}${target}`, { description: [t('qa.preview.updated'), creditDescription(p, t)].filter(Boolean).join(' · '), action: { label: t('toast.qa.apply.open'), onClick: () => goTo('create') } });
+        afterGeneration(p, t);
+      } catch (e) { toast.error(e?.response?.data?.detail || 'Failed.'); }
+      finally { setApplyingId(null); }
+    })();
   };
 
   if (busy) return <Working label="Memeriksa kualitas konten..." sub="Kontradiksi, pengulangan, logika, klaim, dan keselarasan transformasi." />;
@@ -80,16 +97,28 @@ export default function QAStep({ project, setProject, goTo, ensureAuth }) {
           <h3 className="font-semibold mb-3">Masalah <span className="text-muted-foreground font-normal">({(report.issues||[]).length})</span></h3>
           <div className="space-y-2 mb-5" data-testid="qa-issues">
             {(report.issues || []).map((iss, i) => (
-              <Card key={i} className="p-3 bg-card">
-                <div className="flex items-center gap-2 mb-1">
+              <Card key={iss.id || i} className="p-3 bg-card" data-testid={`qa-issue-${i}`}>
+                <div className="flex items-center gap-2 mb-1 flex-wrap">
                   <Badge className={`text-[10px] ${SEV[iss.severity] || SEV.low}`}>{iss.severity}</Badge>
                   <span className="text-xs font-mono text-muted-foreground">{iss.type}</span>
+                  {iss.chapter_num !== undefined && iss.chapter_num !== null && (
+                    <span className="text-[10px] text-muted-foreground">{iss.chapter_num === 0 ? 'Intro' : `Ch. ${iss.chapter_num}`}</span>
+                  )}
+                  <div className="ml-auto">
+                    {iss.resolved ? (
+                      <Badge className="text-[10px] bg-[hsl(var(--success-soft))] text-[hsl(var(--success))] gap-1" data-testid={`qa-issue-resolved-${i}`}><CheckCircle2 className="w-3 h-3" /> {t('qa.resolved')}</Badge>
+                    ) : (project.format === 'ebook' && iss.id) ? (
+                      <Button size="sm" variant="secondary" className="h-7 gap-1 text-xs" disabled={applyingId === iss.id} onClick={() => applyOne(iss)} data-testid={`qa-issue-apply-${i}`}>
+                        <Wand2 className="w-3 h-3" /> {applyingId === iss.id ? '...' : t('qa.applyone')}
+                      </Button>
+                    ) : null}
+                  </div>
                 </div>
                 <p className="text-sm">{iss.detail}</p>
                 {iss.fix && <p className="text-xs text-primary mt-1">→ {iss.fix}</p>}
               </Card>
             ))}
-            {(report.issues||[]).length === 0 && <Card className="p-4 bg-[hsl(var(--success-soft))] border-transparent flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-[hsl(var(--success))]" /> Tidak ada masalah signifikan.</Card>}
+            {(report.issues||[]).length === 0 && <Card className="p-4 bg-[hsl(var(--success-soft))] border-transparent flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-[hsl(var(--success))]" /> No significant issues found.</Card>}
           </div>
           {(report.recommended_improvements || []).length > 0 && (
             <Card className="p-4 bg-secondary">

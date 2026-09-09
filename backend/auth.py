@@ -14,6 +14,7 @@ from fastapi import APIRouter, Request, Response, HTTPException, Depends
 from pydantic import BaseModel
 
 from db import db, serialize_doc
+import billing
 
 logger = logging.getLogger("khova.auth")
 
@@ -30,13 +31,18 @@ async def _create_or_update_user(email: str, name: str, picture: str = "") -> di
             {"email": email},
             {"$set": {"name": name or existing.get("name"), "picture": picture or existing.get("picture")}},
         )
-        return existing
+        return await billing.ensure_user_economy(existing)
     user_id = f"user_{uuid.uuid4().hex[:12]}"
+    plan = billing.DEFAULT_PLAN
     doc = {
         "user_id": user_id,
         "email": email,
         "name": name or email.split("@")[0],
         "picture": picture or "",
+        "role": billing.resolve_role(email),
+        "plan": plan,
+        "credits": billing.plan_def(plan)["start_credits"],
+        "creations_used": 0,
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
     await db.users.insert_one(dict(doc))
@@ -85,6 +91,8 @@ async def _get_user_from_request(request: Request):
     if expires_at < datetime.now(timezone.utc):
         return None
     user = await db.users.find_one({"user_id": session["user_id"]}, {"_id": 0})
+    if user:
+        user = await billing.ensure_user_economy(user)
     return user
 
 

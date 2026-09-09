@@ -241,6 +241,43 @@ async def generate_transformation(opportunity: dict, positioning: dict, product_
 # ---------------------------------------------------------------------------
 # MATH NOTATION POLICY (shared instruction block)
 # ---------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# SECTION BLOCK LABELS (deterministic per PRODUCT language)
+# These are structural headings baked into generated content blocks. They MUST
+# follow the Product Language exactly. Previously the section prompt hardcoded a
+# mix of Indonesian ("Contoh Langkah-demi-Langkah", "Latihan", "Panduan Jawaban")
+# and English ("Action Steps", "Summary") headings, which produced mixed-language
+# products. We now pass explicit heading words so the model never guesses.
+# ---------------------------------------------------------------------------
+SECTION_LABELS = {
+    "id": {"key_idea": "Ide Kunci", "example": "Contoh Langkah-demi-Langkah", "exercise": "Latihan",
+           "answer_guide": "Panduan Jawaban", "action_steps": "Langkah Tindakan", "summary": "Ringkasan",
+           "checklist": "Daftar Periksa", "first_steps": "Yang Harus Dilakukan Lebih Dulu"},
+    "en": {"key_idea": "Key Idea", "example": "Step-by-Step Example", "exercise": "Exercise",
+           "answer_guide": "Answer Guidance", "action_steps": "Action Steps", "summary": "Summary",
+           "checklist": "Checklist", "first_steps": "What To Do First"},
+    "es": {"key_idea": "Idea Clave", "example": "Ejemplo Paso a Paso", "exercise": "Ejercicio",
+           "answer_guide": "Guía de Respuesta", "action_steps": "Pasos de Acción", "summary": "Resumen",
+           "checklist": "Lista de Verificación", "first_steps": "Qué Hacer Primero"},
+    "fr": {"key_idea": "Idée Clé", "example": "Exemple Étape par Étape", "exercise": "Exercice",
+           "answer_guide": "Guide de Réponse", "action_steps": "Étapes d'Action", "summary": "Résumé",
+           "checklist": "Liste de Contrôle", "first_steps": "Que Faire d'Abord"},
+    "de": {"key_idea": "Kernidee", "example": "Schritt-für-Schritt-Beispiel", "exercise": "Übung",
+           "answer_guide": "Lösungshinweis", "action_steps": "Handlungsschritte", "summary": "Zusammenfassung",
+           "checklist": "Checkliste", "first_steps": "Was Zuerst Zu Tun Ist"},
+    "pt": {"key_idea": "Ideia-Chave", "example": "Exemplo Passo a Passo", "exercise": "Exercício",
+           "answer_guide": "Guia de Resposta", "action_steps": "Passos de Ação", "summary": "Resumo",
+           "checklist": "Lista de Verificação", "first_steps": "O Que Fazer Primeiro"},
+    "ja": {"key_idea": "重要ポイント", "example": "ステップ・バイ・ステップの例", "exercise": "練習問題",
+           "answer_guide": "解答の手引き", "action_steps": "アクションステップ", "summary": "まとめ",
+           "checklist": "チェックリスト", "first_steps": "最初にすべきこと"},
+}
+
+
+def _section_labels(product_language: str) -> dict:
+    return SECTION_LABELS.get((product_language or "id").lower(), SECTION_LABELS["en"])
+
+
 MATH_NOTATION_RULES = (
     "MATHEMATICAL NOTATION RULES (mandatory whenever any equation, formula, fraction, exponent, root, "
     "subscript, or mathematical symbol appears): NEVER use LaTeX or $ / $$ delimiters — the PDF renderer "
@@ -304,25 +341,29 @@ async def generate_ebook_plan(opportunity, positioning, transformation, product_
 
 async def generate_ebook_section(chapter, ebook_meta, transformation, product_language, models_config, tone="professional and clear"):
     lang = lang_name(product_language)
+    SL = _section_labels(product_language)
     is_action_plan = (chapter.get("kind") == "action_plan")
     is_math = bool(ebook_meta.get("is_math_heavy"))
     system = (
-        f"You are an expert non-fiction author and instructional designer. Write all output in {lang}. Tone: {tone}. "
+        f"You are an expert non-fiction author and instructional designer. Write ALL output in {lang}. Tone: {tone}. "
         "Write original, useful, specific content. NO filler, NO generic AI prose, NO repetition. "
-        "Use concrete examples, frameworks, and practical steps. Flag any claim needing verification with [verify]."
+        "Use concrete examples, frameworks, and practical steps. Flag any claim needing verification with [verify]. "
+        f"CRITICAL LANGUAGE RULE: every word — including section headings, labels and UI-like phrases — MUST be in {lang}. "
+        "Use EXACTLY the heading words provided below; do not substitute English or any other language."
         + (f"\n{MATH_NOTATION_RULES}" if is_math else "")
     )
     closing_block = (
         "This is the FINAL chapter of the book and must function as a concrete ACTION PLAN / toolkit synthesis: "
         "give the reader a numbered, executable step-by-step plan (with timeframe suggestions), a short checklist "
-        "of what to do first, and how to know they're making progress. Use <div class=\"action-steps\"> for the plan."
+        f"of what to do first, and how to know they're making progress. Use "
+        f"<div class=\"action-steps\"><h4>{SL['action_steps']}</h4><ol><li>...</li></ol></div> for the plan."
         if is_action_plan else
-        "If a worked, step-by-step example genuinely helps this chapter, include exactly one inside "
-        "<div class=\"example\"><h4>Contoh Langkah-demi-Langkah</h4>...</div> (translate the heading to the output "
-        "language) showing real numbers/inputs and the full reasoning, not just the answer. If a short practice "
-        "exercise helps, include <div class=\"exercise\"><h4>Latihan</h4>...<div class=\"answer-guide\"><strong>Panduan "
-        "Jawaban:</strong> ...</div></div> (translate headings) with a real exercise AND guidance on how to check the answer "
-        "(not necessarily the full solved answer, but enough to self-verify)."
+        f"If a worked, step-by-step example genuinely helps this chapter, include exactly one inside "
+        f"<div class=\"example\"><h4>{SL['example']}</h4>...</div> showing real numbers/inputs and the full "
+        f"reasoning, not just the answer. If a short practice exercise helps, include "
+        f"<div class=\"exercise\"><h4>{SL['exercise']}</h4>...<div class=\"answer-guide\"><strong>{SL['answer_guide']}:</strong> "
+        f"...</div></div> with a real exercise AND guidance on how to check the answer (not necessarily the full solved "
+        "answer, but enough to self-verify)."
     )
     prompt = (
         f"Ebook: {ebook_meta.get('title','')} — {ebook_meta.get('subtitle','')}\n"
@@ -332,20 +373,29 @@ async def generate_ebook_section(chapter, ebook_meta, transformation, product_la
         f"Write chapter {chapter.get('chapter_num')}: \"{chapter.get('title')}\".\n"
         f"Chapter purpose: {chapter.get('purpose','')}. Key lesson: {chapter.get('key_lesson','')}.\n\n"
         f"{closing_block}\n\n"
-        "Return ONLY clean semantic HTML (no <html>/<body> wrapper, no markdown). Use these building blocks where appropriate:\n"
+        "Return ONLY clean semantic HTML (no <html>/<body> wrapper, no markdown). Use these building blocks where appropriate.\n"
+        f"IMPORTANT — use these EXACT heading words (they are already in the correct language, {lang}):\n"
+        f"  - Callout heading word: \"{SL['key_idea']}\"\n"
+        f"  - Example block heading: \"{SL['example']}\"\n"
+        f"  - Exercise block heading: \"{SL['exercise']}\"\n"
+        f"  - Answer-guidance label: \"{SL['answer_guide']}\"\n"
+        f"  - Action-steps heading: \"{SL['action_steps']}\"\n"
+        f"  - Summary heading: \"{SL['summary']}\"\n\n"
+        "Blocks:\n"
         "  <p>...</p> for prose\n"
         "  <h3>...</h3> for subheadings\n"
         "  <ul><li>...</li></ul> for lists\n"
         "  <table>...</table> for useful tables/comparisons\n"
-        "  <div class=\"callout\"><strong>Key idea:</strong> ...</div> for important callouts (use sparingly, max 1-2 per chapter)\n"
+        f"  <div class=\"callout\"><strong>{SL['key_idea']}:</strong> ...</div> for important callouts (use sparingly, max 1-2 per chapter)\n"
         "  <div class=\"pullquote\">...</div> for one short, punchy standalone insight (optional, max 1 per chapter)\n"
-        "  <div class=\"example\">...</div> for concrete examples\n"
-        "  <div class=\"action-steps\"><h4>Action Steps</h4><ol><li>...</li></ol></div>\n"
-        "  <div class=\"exercise\">...</div> (when appropriate)\n"
-        "  <div class=\"summary\"><h4>Summary</h4>...</div> at the end.\n"
+        f"  <div class=\"example\"><h4>{SL['example']}</h4>...</div> for concrete worked examples\n"
+        f"  <div class=\"action-steps\"><h4>{SL['action_steps']}</h4><ol><li>...</li></ol></div>\n"
+        f"  <div class=\"exercise\"><h4>{SL['exercise']}</h4>...</div> (when appropriate)\n"
+        f"  <div class=\"summary\"><h4>{SL['summary']}</h4>...</div> at the end.\n"
         "Do NOT overuse boxes — most of the chapter should be well-structured prose with clear subheadings; use the "
         "special blocks only where they add real value, not as decoration. Aim for 700-1100 words of substantive "
-        "content. Do not include the chapter title as an <h2> (it is added automatically)."
+        "content. Do not include the chapter title as an <h2> (it is added automatically). "
+        f"Remember: NEVER use English/other-language headings — always use the exact {lang} words above."
     )
     html = await llm_text("writing", models_config, system, prompt)
     # strip accidental code fences / html wrapper
@@ -455,23 +505,57 @@ async def generate_website_spec(opportunity, positioning, transformation, style,
     return await llm_json("strategy", models_config, system, prompt)
 
 
-# ---------------------------------------------------------------------------
-# 14. CONTENT QA
-# ---------------------------------------------------------------------------
+WEBSITE_SECTION_HINTS = {
+    "hero": '{"headline": str, "subheadline": str, "cta": str}',
+    "problem": '{"title": str, "body": str, "bullets": [str]}',
+    "transformation": '{"title": str, "before": [str], "after": [str]}',
+    "benefits": '{"title": str, "items": [{"title": str, "desc": str}]}',
+    "whats_included": '{"title": str, "items": [str]}',
+    "how_it_works": '{"title": str, "steps": [{"title": str, "desc": str}]}',
+    "social_proof": '{"title": str, "placeholder": str}',
+    "faq": '{"title": str, "items": [{"q": str, "a": str}]}',
+    "final_cta": '{"headline": str, "cta": str}',
+}
+
+
+async def regenerate_website_section(spec, section, instruction, product_language, models_config):
+    """Regenerate ONE landing-page section, returning just that section's JSON
+    (same shape it had). Keeps the rest of the page untouched."""
+    lang = lang_name(product_language)
+    shape = WEBSITE_SECTION_HINTS.get(section, "{}")
+    system = f"You are a conversion copywriter. Write all copy in {lang}. Return ONLY the JSON for the requested section."
+    prompt = (
+        f"Full current landing page (for context): {json.dumps(spec, ensure_ascii=False)[:4000]}\n\n"
+        f"Rewrite ONLY the '{section}' section. {('User instruction: ' + instruction) if instruction else 'Make it sharper, clearer and more persuasive while keeping meaning.'}\n"
+        f"Return JSON with EXACTLY this shape (no wrapper key): {shape}\n"
+        "Return valid JSON only."
+    )
+    data = await llm_json("strategy", models_config, system, prompt)
+    # tolerate the model wrapping it under the section key
+    if isinstance(data, dict) and section in data and isinstance(data[section], (dict, list)):
+        return data[section]
+    return data
 async def qa_review(format_type, content_text, transformation, product_language, models_config):
     lang = lang_name(product_language)
-    system = f"You are a rigorous content QA editor. Write all output in {lang}."
+    system = (
+        f"You are a rigorous content QA editor. Write all output in {lang}. "
+        f"IMPORTANT: the product must be entirely in {lang}. Flag ANY sentence, heading or label written in a "
+        f"different language as a 'language_inconsistency' issue."
+    )
     prompt = (
         f"Review this {format_type} product content for quality.\n\n"
+        f"The content is organised by chapters marked as '# <chapter title>' (chapter 0 = introduction).\n"
         f"Content (may be truncated):\n{content_text[:9000]}\n\n"
-        f"Transformation to align with: {transformation.get('core_transformation','') if transformation else ''}\n\n"
+        f"Target product language: {lang}. Transformation to align with: {transformation.get('core_transformation','') if transformation else ''}\n\n"
         "Return JSON:\n"
         "{\n"
-        '  \"scores\": {\"clarity\": 1-10, \"logic\": 1-10, \"usefulness\": 1-10, \"originality\": 1-10, \"formatting\": 1-10, \"transformation_alignment\": 1-10},\n'
+        '  \"scores\": {\"clarity\": 1-10, \"logic\": 1-10, \"usefulness\": 1-10, \"originality\": 1-10, \"formatting\": 1-10, \"transformation_alignment\": 1-10, \"language_consistency\": 1-10},\n'
         '  \"overall\": 1-10,\n'
-        '  \"issues\": [ {\"type\": \"contradiction|repetition|weak_explanation|missing_content|poor_logic|unsupported_claim|unclear_instruction|ai_sounding|formatting\", \"severity\": \"low|medium|high\", \"detail\": str, \"fix\": str} ],\n'
+        '  \"issues\": [ {\"type\": \"contradiction|repetition|weak_explanation|missing_content|poor_logic|unsupported_claim|unclear_instruction|ai_sounding|formatting|language_inconsistency\", \"severity\": \"low|medium|high\", \"detail\": str, \"fix\": str, \"chapter_num\": int, \"location\": \"short quote or section name where it occurs\"} ],\n'
         '  \"recommended_improvements\": [str]\n'
-        "}\nReturn valid JSON only."
+        "}\n"
+        "For each issue set chapter_num to the chapter it belongs to (0 for the introduction or a general/whole-book issue). "
+        "Keep 'fix' concrete and actionable. Return valid JSON only."
     )
     return await llm_json("qa", models_config, system, prompt)
 
