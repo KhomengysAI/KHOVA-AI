@@ -1,18 +1,30 @@
 [
   {
-    "content": "Phase 1 refinement: localization, dashboard, opportunities, palette, feedback, preview, QA",
+    "content": "Phase 2: ebook plan/section/rewrite math+productization prompts",
     "status": "completed"
   },
   {
-    "content": "Visual design system re-theme to blue Khova identity",
+    "content": "Phase 2: bonus asset spec + XLSX generation endpoint",
     "status": "completed"
   },
   {
-    "content": "Run testing_agent_v3 full regression",
+    "content": "Phase 2: exporters.py editorial CSS overhaul + math notation + cover redesign",
     "status": "completed"
   },
   {
-    "content": "Verify product_language propagation live (en/id) via curl",
+    "content": "Phase 2: frontend bonus/illustration UI wiring",
+    "status": "completed"
+  },
+  {
+    "content": "Phase 2: real end-to-end PDF visual QA (found & fixed inline-flex fraction bug)",
+    "status": "completed"
+  },
+  {
+    "content": "Run testing_agent_v3 regression",
+    "status": "completed"
+  },
+  {
+    "content": "Verify testing agent's '/projects redirect' report -> confirmed false positive (cross-user ownership, not a bug); live-verified EbookCreator bonus button end-to-end in browser",
     "status": "completed"
   }
 ]

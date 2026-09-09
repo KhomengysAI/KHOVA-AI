@@ -239,6 +239,23 @@ async def generate_transformation(opportunity: dict, positioning: dict, product_
 
 
 # ---------------------------------------------------------------------------
+# MATH NOTATION POLICY (shared instruction block)
+# ---------------------------------------------------------------------------
+MATH_NOTATION_RULES = (
+    "MATHEMATICAL NOTATION RULES (mandatory whenever any equation, formula, fraction, exponent, root, "
+    "subscript, or mathematical symbol appears): NEVER use LaTeX or $ / $$ delimiters — the PDF renderer "
+    "cannot display LaTeX and it will appear as broken literal text. Instead use ONLY these safe HTML patterns:\n"
+    "  - Exponents: <sup>2</sup> (e.g. x<sup>2</sup>)\n"
+    "  - Subscripts: <sub>1</sub> (e.g. x<sub>1</sub>)\n"
+    "  - Fractions: <span class=\"frac\"><span class=\"num\">a</span><span class=\"den\">b</span></span>\n"
+    "  - Square roots: <span class=\"sqrt\"><span class=\"radicand\">x+1</span></span>\n"
+    "  - Symbols: use direct unicode characters — π, √, ∑, ∫, ∞, ±, ≤, ≥, ≠, ×, ÷, Δ, θ, α, β, →, ⇒\n"
+    "  - Full equations: wrap in <div class=\"equation\">...</div> centered on its own line, never split an "
+    "equation across two elements, never leave a lone number/bullet on its own line.\n"
+)
+
+
+# ---------------------------------------------------------------------------
 # 8. EBOOK PLANNER
 # ---------------------------------------------------------------------------
 async def generate_ebook_plan(opportunity, positioning, transformation, product_language, models_config, palette=None):
@@ -248,16 +265,34 @@ async def generate_ebook_plan(opportunity, positioning, transformation, product_
         f"Opportunity: {json.dumps(opportunity, ensure_ascii=False)}\n"
         f"Positioning: {json.dumps(positioning, ensure_ascii=False)}\n"
         f"Transformation: {json.dumps(transformation, ensure_ascii=False)}\n\n"
-        "Plan a premium, genuinely useful ebook. Return JSON:\n"
+        "Plan a premium, genuinely USEFUL ebook that reads like a real productized toolkit, not a generic long "
+        "document. Return JSON:\n"
         "{\n"
         '  \"meta\": {\"title\": str, \"subtitle\": str, \"audience\": str, \"core_promise\": str, \"description\": str,\n'
-        '            \"learning_outcomes\": [str], \"reading_time\": str, \"chapter_count\": int},\n'
-        '  \"toc\": [ {\"chapter_num\": 1, \"title\": str, \"purpose\": str, \"key_lesson\": str} ],\n'
-        '  \"visuals\": [ {\"chapter_num\": 1, \"purpose\": str, \"visual_type\": \"illustration|diagram|infographic|chart|icon\", \"prompt\": \"detailed image generation prompt\"} ],\n'
-        '  \"bonuses\": [ {\"title\": str, \"type\": \"checklist|worksheet|action_plan|prompt_library|template|quick_start\", \"description\": str} ]\n'
+        '            \"learning_outcomes\": [str], \"reading_time\": str, \"chapter_count\": int,\n'
+        '            \"is_math_heavy\": bool},\n'
+        '  \"toc\": [ {\"chapter_num\": 1, \"title\": str, \"purpose\": str, \"key_lesson\": str, \"kind\": \"standard|action_plan\",\n'
+        '             \"needs_worked_example\": bool, \"needs_exercise\": bool} ],\n'
+        '  \"visuals\": [ {\"chapter_num\": 1, \"purpose\": str, \"visual_type\": \"illustration|diagram|process_flow|infographic|comparison|framework|decision_tree|timeline|chart\",\n'
+        '                \"prompt\": \"detailed image generation prompt (no text/words in the image)\", \"aspect_ratio\": \"1:1|4:3|16:9|3:4\", \"placement\": \"chapter_top\"} ],\n'
+        '  \"bonuses\": [ {\"title\": str,\n'
+        '                \"type\": \"checklist|worksheet|action_plan|planner|tracker|progress_tracker|reference_sheet|mistake_log|answer_sheet|decision_tree|diagnostic_test|prompt_library|template|quick_start\",\n'
+        '                \"description\": str} ]\n'
         "}\n"
-        "Rules: 6-10 chapters unless the topic clearly needs otherwise. Suggest 2-4 visuals total (only where they add real value). "
-        "Suggest 1-3 relevant bonuses. Return valid JSON only."
+        "Rules:\n"
+        "- 6-10 chapters unless the topic clearly needs otherwise.\n"
+        "- The LAST chapter in toc MUST have kind=\"action_plan\": a synthesis/toolkit chapter that turns the whole "
+        "book into a concrete step-by-step plan the reader can execute immediately (not a repeat of earlier content).\n"
+        "- For educational/how-to topics, mark needs_worked_example=true and needs_exercise=true on the chapters "
+        "where a step-by-step worked example and a practice exercise would genuinely help (not every chapter needs both).\n"
+        "- Set meta.is_math_heavy=true only if the topic genuinely involves formulas/equations/calculations.\n"
+        "- Only propose visuals where they truly add comprehension value (2-4 total) — never decorative filler. "
+        "Prefer diagram/process_flow/framework/decision_tree/comparison/timeline over generic illustration when the "
+        "content is conceptual/technical.\n"
+        "- Select 1-3 bonuses that are DIRECTLY useful tools supporting this specific transformation (do not pick "
+        "types that don't fit the topic — e.g. only propose diagnostic_test/mistake_log/answer_sheet for learning "
+        "topics with graded skill progress, only propose tracker/planner for habit/process topics).\n"
+        "Return valid JSON only."
     )
     plan = await llm_json("strategy", models_config, system, prompt)
     # attach ids to toc/sections
@@ -269,10 +304,25 @@ async def generate_ebook_plan(opportunity, positioning, transformation, product_
 
 async def generate_ebook_section(chapter, ebook_meta, transformation, product_language, models_config, tone="professional and clear"):
     lang = lang_name(product_language)
+    is_action_plan = (chapter.get("kind") == "action_plan")
+    is_math = bool(ebook_meta.get("is_math_heavy"))
     system = (
-        f"You are an expert non-fiction author. Write all output in {lang}. Tone: {tone}. "
+        f"You are an expert non-fiction author and instructional designer. Write all output in {lang}. Tone: {tone}. "
         "Write original, useful, specific content. NO filler, NO generic AI prose, NO repetition. "
         "Use concrete examples, frameworks, and practical steps. Flag any claim needing verification with [verify]."
+        + (f"\n{MATH_NOTATION_RULES}" if is_math else "")
+    )
+    closing_block = (
+        "This is the FINAL chapter of the book and must function as a concrete ACTION PLAN / toolkit synthesis: "
+        "give the reader a numbered, executable step-by-step plan (with timeframe suggestions), a short checklist "
+        "of what to do first, and how to know they're making progress. Use <div class=\"action-steps\"> for the plan."
+        if is_action_plan else
+        "If a worked, step-by-step example genuinely helps this chapter, include exactly one inside "
+        "<div class=\"example\"><h4>Contoh Langkah-demi-Langkah</h4>...</div> (translate the heading to the output "
+        "language) showing real numbers/inputs and the full reasoning, not just the answer. If a short practice "
+        "exercise helps, include <div class=\"exercise\"><h4>Latihan</h4>...<div class=\"answer-guide\"><strong>Panduan "
+        "Jawaban:</strong> ...</div></div> (translate headings) with a real exercise AND guidance on how to check the answer "
+        "(not necessarily the full solved answer, but enough to self-verify)."
     )
     prompt = (
         f"Ebook: {ebook_meta.get('title','')} — {ebook_meta.get('subtitle','')}\n"
@@ -281,17 +331,21 @@ async def generate_ebook_section(chapter, ebook_meta, transformation, product_la
         f"Core transformation: {transformation.get('core_transformation','') if transformation else ''}\n\n"
         f"Write chapter {chapter.get('chapter_num')}: \"{chapter.get('title')}\".\n"
         f"Chapter purpose: {chapter.get('purpose','')}. Key lesson: {chapter.get('key_lesson','')}.\n\n"
+        f"{closing_block}\n\n"
         "Return ONLY clean semantic HTML (no <html>/<body> wrapper, no markdown). Use these building blocks where appropriate:\n"
         "  <p>...</p> for prose\n"
         "  <h3>...</h3> for subheadings\n"
         "  <ul><li>...</li></ul> for lists\n"
-        "  <table>...</table> for useful tables\n"
-        "  <div class=\"callout\"><strong>Key idea:</strong> ...</div> for important callouts\n"
-        "  <div class=\"example\"><strong>Example:</strong> ...</div> for concrete examples\n"
+        "  <table>...</table> for useful tables/comparisons\n"
+        "  <div class=\"callout\"><strong>Key idea:</strong> ...</div> for important callouts (use sparingly, max 1-2 per chapter)\n"
+        "  <div class=\"pullquote\">...</div> for one short, punchy standalone insight (optional, max 1 per chapter)\n"
+        "  <div class=\"example\">...</div> for concrete examples\n"
         "  <div class=\"action-steps\"><h4>Action Steps</h4><ol><li>...</li></ol></div>\n"
-        "  <div class=\"exercise\"><h4>Exercise</h4>...</div> (when appropriate)\n"
+        "  <div class=\"exercise\">...</div> (when appropriate)\n"
         "  <div class=\"summary\"><h4>Summary</h4>...</div> at the end.\n"
-        "Aim for 700-1100 words of substantive content. Do not include the chapter title as an <h2> (it is added automatically)."
+        "Do NOT overuse boxes — most of the chapter should be well-structured prose with clear subheadings; use the "
+        "special blocks only where they add real value, not as decoration. Aim for 700-1100 words of substantive "
+        "content. Do not include the chapter title as an <h2> (it is added automatically)."
     )
     html = await llm_text("writing", models_config, system, prompt)
     # strip accidental code fences / html wrapper
@@ -305,12 +359,16 @@ async def generate_ebook_section(chapter, ebook_meta, transformation, product_la
     return html.strip()
 
 
-async def rewrite_section(existing_html, instruction, product_language, models_config):
+async def rewrite_section(existing_html, instruction, product_language, models_config, is_math=False):
     lang = lang_name(product_language)
-    system = f"You are an expert editor. Write all output in {lang}. Keep the same clean HTML block style."
+    system = (
+        f"You are an expert editor. Write all output in {lang}. Keep the same clean HTML block style."
+        + (f"\n{MATH_NOTATION_RULES}" if is_math else "")
+    )
     prompt = (
         f"Instruction: {instruction}\n\nCurrent chapter HTML:\n{existing_html}\n\n"
-        "Return the improved chapter as clean semantic HTML only (no markdown, no html/body wrapper)."
+        "Return the improved chapter as clean semantic HTML only (no markdown, no html/body wrapper). "
+        "If the current HTML contains LaTeX/$ math delimiters, convert them to the safe HTML math patterns."
     )
     html = await llm_text("writing", models_config, system, prompt)
     html = html.strip()
@@ -438,6 +496,42 @@ async def generate_branding(opportunity, positioning, transformation, style, pro
     return await llm_json("strategy", models_config, system, prompt)
 
 
+async def generate_bonus_asset_spec(bonus, ebook_meta, transformation, product_language, models_config):
+    """Turn a planned bonus (e.g. 'Study Tracker') into an ACTUAL usable spreadsheet spec
+    (same JSON contract as generate_spreadsheet_spec) so it can be exported as a real XLSX
+    file instead of just a text description."""
+    lang = lang_name(product_language)
+    system = (
+        f"You are a productization specialist. Write all labels/instructions in {lang}. "
+        "Turn a bonus concept into a genuinely usable single-purpose spreadsheet tool. "
+        "Do NOT just place descriptive text into cells — build real usable rows/columns."
+    )
+    prompt = (
+        f"Ebook: {ebook_meta.get('title','')} — {ebook_meta.get('subtitle','')}\n"
+        f"Core transformation: {transformation.get('core_transformation','') if transformation else ''}\n"
+        f"Bonus to build: {json.dumps(bonus, ensure_ascii=False)}\n\n"
+        "Return JSON describing a small 1-2 sheet workbook for this SPECIFIC bonus:\n"
+        "{\n"
+        '  \"concept\": str,\n'
+        '  \"product_type\": str,\n'
+        '  \"sheets\": [\n'
+        "    {\n"
+        '      \"name\": str,\n'
+        '      \"purpose\": str,\n'
+        '      \"instructions\": str,\n'
+        '      \"columns\": [ {\"header\": str, \"type\": \"text|number|currency|percent|date|formula\", \"formula_template\": \"=B{r}-C{r}\", \"dropdown\": [\"opt1\",\"opt2\"] } ],\n'
+        '      \"example_rows\": [ [\"cell1\", 123, 456] ],\n'
+        '      \"totals\": [ {\"label\": str, \"col_index\": 1, \"formula\": \"=SUM(B{first}:B{last})\"} ]\n'
+        "    }\n"
+        "  ]\n"
+        "}\n"
+        "Rules: 1-2 sheets max. Provide 5-12 example/template rows that are genuinely usable as-is "
+        "(e.g. for a checklist: rows are the actual checklist items; for a tracker: rows are sample entries "
+        "the user can overwrite; for an answer sheet: rows are question/answer pairs). Return valid JSON only."
+    )
+    return await llm_json("strategy", models_config, system, prompt)
+
+
 def build_cover_prompt(branding, ebook_meta, palette):
     colors = ""
     if palette:
@@ -447,8 +541,10 @@ def build_cover_prompt(branding, ebook_meta, palette):
     title = (ebook_meta or {}).get("title") or (branding or {}).get("title") or "Digital Product"
     concept = (branding or {}).get("cover_concept", "")
     return (
-        f"A premium, professional ebook cover illustration (NO text, NO words, NO letters). "
-        f"Concept: {concept}. Theme relates to: {title}. "
+        f"A premium, professional ebook cover ARTWORK ONLY — absolutely NO text, NO words, NO letters, NO numbers, "
+        f"NO typography of any kind rendered in the image itself (title/author text will be added separately as real "
+        f"HTML typography on top). Concept: {concept}. Theme relates to: {title}. "
         f"Use this color palette: {colors}. Clean, modern, high-end editorial style, abstract or symbolic imagery, "
-        f"balanced composition, suitable as a book cover background. Vertical portrait orientation."
+        f"leave the bottom third of the composition visually calmer/darker so text can be legibly overlaid there. "
+        f"Balanced composition, suitable as a book cover background. Vertical portrait orientation, aspect ratio 3:4."
     )

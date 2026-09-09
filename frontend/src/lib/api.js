@@ -65,6 +65,7 @@ export const runQA = (id) => api.post(`/projects/${id}/qa`, {}).then(r => r.data
 export const applyQA = (id) => api.post(`/projects/${id}/qa/apply`).then(r => r.data);
 export const genBranding = (id, style) => api.post(`/projects/${id}/branding`, { style }).then(r => r.data);
 export const genBonuses = (id) => api.post(`/projects/${id}/bonuses`).then(r => r.data);
+export const ebookBonusGenerate = (id, index) => api.post(`/projects/${id}/ebook/bonus/${index}/generate`).then(r => r.data);
 
 // --- assets ---
 export const downloadUrl = (id, assetId) => `${API_BASE}/projects/${id}/assets/${assetId}/download`;

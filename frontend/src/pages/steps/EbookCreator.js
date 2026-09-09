@@ -1,13 +1,13 @@
 import React, { useState } from 'react';
 import { useLang } from '@/lib/i18n';
-import { ebookPlan, ebookSection, ebookIntro, ebookRewrite, ebookCover, ebookIllustration, ebookPreviewUrl } from '@/lib/api';
+import { ebookPlan, ebookSection, ebookIntro, ebookRewrite, ebookCover, ebookIllustration, ebookPreviewUrl, ebookBonusGenerate } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Working } from '@/components/Loading';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from '@/components/ui/dropdown-menu';
-import { BookOpen, ArrowRight, RefreshCw, Wand2, Image as ImageIcon, Eye, Check, Loader2, MoreHorizontal, FileText } from 'lucide-react';
+import { BookOpen, ArrowRight, RefreshCw, Wand2, Image as ImageIcon, Eye, Check, Loader2, MoreHorizontal, FileText, Download, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 import { downloadUrl } from '@/lib/api';
 
@@ -16,6 +16,8 @@ export default function EbookCreator({ project, setProject, goTo, ensureAuth }) 
   const [busy, setBusy] = useState(false);
   const [genCh, setGenCh] = useState(null);
   const [coverBusy, setCoverBusy] = useState(false);
+  const [bonusBusy, setBonusBusy] = useState(null);
+  const [illoAllBusy, setIlloAllBusy] = useState(false);
   const ebook = project.ebook;
 
   const doPlan = () => { if (!ensureAuth(doPlan)) return; (async () => { setBusy(true); try { const p = await ebookPlan(project.id); setProject(p); toast.success('Rencana ebook dibuat'); } catch (e) { toast.error(e?.response?.data?.detail || 'Gagal.'); } finally { setBusy(false); } })(); };
@@ -41,6 +43,26 @@ export default function EbookCreator({ project, setProject, goTo, ensureAuth }) 
   const doCover = async () => { if (!ensureAuth(doCover)) return; setCoverBusy(true); try { const p = await ebookCover(project.id); setProject(p); toast.success('Cover dibuat'); } catch (e) { toast.error('Gagal membuat cover.'); } finally { setCoverBusy(false); } };
   const rewrite = async (num, instruction) => { setGenCh(num); try { const p = await ebookRewrite(project.id, num, instruction); setProject(p); toast.success('Bab diperbarui'); } catch (e) { toast.error('Gagal.'); } finally { setGenCh(null); } };
   const genIllo = async (num) => { setGenCh(num); try { const p = await ebookIllustration(project.id, num); setProject(p); toast.success('Ilustrasi dibuat'); } catch (e) { toast.error('Gagal.'); } finally { setGenCh(null); } };
+  const genAllIllos = async () => {
+    if (!ensureAuth(genAllIllos)) return;
+    setIlloAllBusy(true);
+    const visuals = ebook.visuals || [];
+    const doneIllos = new Set(Object.keys(ebook.illustrations || {}).map(Number));
+    let ok = 0;
+    for (const v of visuals) {
+      if (doneIllos.has(v.chapter_num)) continue;
+      try { const p = await ebookIllustration(project.id, v.chapter_num, v.prompt); setProject(p); ok++; }
+      catch (e) { /* continue with remaining */ }
+    }
+    setIlloAllBusy(false);
+    toast.success(ok > 0 ? `${ok} ilustrasi dibuat` : 'Semua ilustrasi sudah ada');
+  };
+  const genBonusAsset = async (idx) => {
+    setBonusBusy(idx);
+    try { const p = await ebookBonusGenerate(project.id, idx); setProject(p); toast.success('Bonus siap diunduh'); }
+    catch (e) { toast.error(e?.response?.data?.detail || 'Gagal membuat bonus.'); }
+    finally { setBonusBusy(null); }
+  };
 
   if (busy) return <Working label="Menyusun rencana ebook..." sub="Judul, daftar isi, ide visual, dan bonus." />;
 
@@ -59,6 +81,8 @@ export default function EbookCreator({ project, setProject, goTo, ensureAuth }) 
   const doneNums = new Set(sections.map(s => s.chapter_num));
   const progress = toc.length ? Math.round((sections.length / toc.length) * 100) : 0;
   const coverAsset = (project.assets || []).find(a => a.type === 'cover');
+  const visuals = ebook.visuals || [];
+  const pendingIllos = visuals.filter(v => !(ebook.illustrations || {})[v.chapter_num]).length;
 
   return (
     <div>
@@ -100,6 +124,7 @@ export default function EbookCreator({ project, setProject, goTo, ensureAuth }) 
                       <div className="min-w-0">
                         <div className="font-medium text-sm truncate flex items-center gap-1.5">
                           {ch.title}
+                          {ch.kind === 'action_plan' && <Badge variant="secondary" className="text-[9px]">Action Plan</Badge>}
                           {hasVersions && <Badge variant="outline" className="text-[9px]" data-testid={`ebook-chapter-improved-${ch.chapter_num}`}>Diperbaiki</Badge>}
                         </div>
                         <div className="text-xs text-muted-foreground truncate">{ch.purpose}</div>
@@ -142,10 +167,36 @@ export default function EbookCreator({ project, setProject, goTo, ensureAuth }) 
               {coverBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ImageIcon className="w-3.5 h-3.5" />} {coverAsset ? 'Buat ulang cover' : 'Buat cover (AI)'}
             </Button>
           </Card>
+
+          {visuals.length > 0 && (
+            <Card className="p-4 bg-card">
+              <div className="text-sm font-medium mb-2">Ilustrasi Bab ({Object.keys(ebook.illustrations || {}).length}/{visuals.length})</div>
+              <p className="text-xs text-muted-foreground mb-3">Visual direncanakan untuk bab tertentu agar pemahaman lebih mudah.</p>
+              <Button variant="secondary" size="sm" className="w-full gap-1" onClick={genAllIllos} disabled={illoAllBusy || pendingIllos === 0} data-testid="ebook-generate-all-illustrations">
+                {illoAllBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />} {pendingIllos === 0 ? 'Semua ilustrasi selesai' : `Buat ${pendingIllos} ilustrasi`}
+              </Button>
+            </Card>
+          )}
+
           <Card className="p-4 bg-card">
             <div className="text-sm font-medium mb-2">Bonus</div>
-            <div className="space-y-2">
-              {(ebook.bonuses || []).map((b, i) => (<div key={i} className="text-xs"><Badge variant="outline" className="text-[10px] mb-1">{b.type}</Badge><div className="font-medium">{b.title}</div></div>))}
+            <div className="space-y-3">
+              {(ebook.bonuses || []).map((b, i) => (
+                <div key={i} className="text-xs border border-border rounded-lg p-2.5" data-testid={`ebook-bonus-${i}`}>
+                  <Badge variant="outline" className="text-[10px] mb-1">{b.type}</Badge>
+                  <div className="font-medium text-sm">{b.title}</div>
+                  <p className="text-muted-foreground mt-0.5 mb-2">{b.description}</p>
+                  {b.asset_id ? (
+                    <a href={downloadUrl(project.id, b.asset_id)}>
+                      <Button size="sm" variant="secondary" className="w-full gap-1" data-testid={`ebook-bonus-download-${i}`}><Download className="w-3.5 h-3.5" /> Unduh XLSX</Button>
+                    </a>
+                  ) : (
+                    <Button size="sm" className="w-full gap-1" onClick={() => genBonusAsset(i)} disabled={bonusBusy === i} data-testid={`ebook-bonus-generate-${i}`}>
+                      {bonusBusy === i ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FileText className="w-3.5 h-3.5" />} Buat File Bonus
+                    </Button>
+                  )}
+                </div>
+              ))}
               {(ebook.bonuses || []).length === 0 && <p className="text-xs text-muted-foreground">Tidak ada bonus.</p>}
             </div>
           </Card>

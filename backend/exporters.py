@@ -159,11 +159,6 @@ def build_ebook_html(ebook: dict, branding: dict, transformation: dict, cover_by
     subtitle = _html.escape(meta.get("subtitle") or (branding or {}).get("subtitle") or "")
     author = _html.escape((branding or {}).get("author") or "")
 
-    cover_img = ""
-    if cover_bytes:
-        b64 = base64.b64encode(cover_bytes).decode()
-        cover_img = f'<img class="cover-img" src="data:{cover_mime};base64,{b64}" />'
-
     # TOC
     toc = ebook.get("toc", []) or []
     sections = {s.get("chapter_num"): s for s in (ebook.get("sections", []) or [])}
@@ -186,11 +181,15 @@ def build_ebook_html(ebook: dict, branding: dict, transformation: dict, cover_by
             ib, imime = illustrations[num]
             ib64 = base64.b64encode(ib).decode()
             illo = f'<div class="illo"><img src="data:{imime};base64,{ib64}" /></div>'
+        dek = _html.escape(ch.get("purpose", "") or "")
+        dek_html = f'<div class="chapter-dek">{dek}</div>' if dek else ""
         chapters_html += f'''
         <section class="chapter">
           <div class="chapter-head">
+            <div class="chapter-num-badge">{num}</div>
             <div class="chapter-kicker">{L['chapter']} {num}</div>
             <h2>{_html.escape(ch.get("title",""))}</h2>
+            {dek_html}
           </div>
           {illo}
           {content}
@@ -213,53 +212,85 @@ def build_ebook_html(ebook: dict, branding: dict, transformation: dict, cover_by
         lis = "".join([f"<li>{_html.escape(o)}</li>" for o in outcomes])
         outcomes_html = f'<div class="callout"><strong>{L["outcomes_intro"]}</strong><ul>{lis}</ul></div>'
 
+    has_cover_img = bool(cover_bytes)
+
     css = f'''
     @page {{
         size: A4;
-        margin: 2.2cm 2cm 2.4cm 2cm;
-        @bottom-center {{ content: counter(page); color: {pal['secondary']}; font-family: {body_font}; font-size: 10px; }}
+        margin: 2.4cm 2cm 2.4cm 2cm;
+        @bottom-center {{ content: counter(page); color: {pal['secondary']}; font-family: {body_font}; font-size: 9.5px; }}
     }}
     @page :first {{ margin: 0; }}
     * {{ box-sizing: border-box; }}
-    body {{ font-family: {body_font}; color: {pal['text']}; font-size: 11.5pt; line-height: 1.6; }}
-    h1, h2, h3, h4 {{ font-family: {heading_font}; color: {pal['secondary']}; line-height: 1.2; }}
-    .cover {{ height: 297mm; width: 100%; background: {pal['primary']}; color: #fff; position: relative; page-break-after: always; }}
-    .cover-inner {{ position: absolute; inset: 0; padding: 30mm 22mm; display: flex; flex-direction: column; }}
-    .cover-img {{ width: 100%; height: 150mm; object-fit: cover; border-radius: 6px; margin-bottom: 14mm; }}
-    .cover h1 {{ color: #fff; font-size: 34pt; margin: 0 0 6mm 0; }}
-    .cover .sub {{ color: rgba(255,255,255,0.9); font-size: 15pt; font-family: {body_font}; }}
-    .cover .author {{ margin-top: auto; color: rgba(255,255,255,0.9); font-size: 12pt; font-family: {body_font}; }}
-    .cover .brandbar {{ height: 4mm; width: 40mm; background: {pal['accent']}; margin-bottom: 10mm; }}
+    body {{ font-family: {body_font}; color: {pal['text']}; font-size: 11.5pt; line-height: 1.65; orphans: 3; widows: 3; }}
+    h1, h2, h3, h4 {{ font-family: {heading_font}; color: {pal['secondary']}; line-height: 1.2; page-break-after: avoid; }}
+    p, li {{ orphans: 3; widows: 3; }}
+
+    /* ---------- COVER (real designed cover, AI artwork + deterministic HTML typography) ---------- */
+    .cover {{ height: 297mm; width: 100%; background: {pal['secondary']}; color: #fff; position: relative; page-break-after: always; overflow: hidden; }}
+    .cover-bg {{ position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }}
+    .cover-scrim {{ position: absolute; inset: 0; background: {'linear-gradient(180deg, rgba(0,0,0,0.05) 0%, rgba(0,0,0,0.15) 45%, rgba(0,0,0,0.86) 100%)' if has_cover_img else f"linear-gradient(160deg, {pal['secondary']} 0%, {pal['primary']} 100%)"}; }}
+    .cover-inner {{ position: absolute; inset: 0; padding: 24mm 20mm; display: flex; flex-direction: column; justify-content: flex-end; }}
+    .cover .brandbar {{ height: 3mm; width: 32mm; background: {pal['accent']}; margin-bottom: 8mm; border-radius: 2px; }}
+    .cover h1 {{ color: #fff; font-size: 30pt; margin: 0 0 5mm 0; line-height: 1.12; }}
+    .cover .sub {{ color: rgba(255,255,255,0.88); font-size: 13.5pt; font-family: {body_font}; margin-bottom: 10mm; }}
+    .cover .author {{ color: rgba(255,255,255,0.75); font-size: 10.5pt; font-family: {body_font}; text-transform: uppercase; letter-spacing: 1px; }}
+
+    /* ---------- COLOPHON / copyright page ---------- */
     .page {{ page-break-after: always; }}
-    .title-page {{ padding-top: 40mm; }}
-    .title-page h1 {{ font-size: 26pt; color: {pal['secondary']}; }}
-    .title-page .sub {{ font-size: 14pt; color: {pal['primary']}; }}
-    .disclaimer {{ font-size: 9.5pt; color: #555; margin-top: 60mm; border-top: 1px solid {pal['accent']}; padding-top: 6mm; }}
-    .toc-title-h {{ color: {pal['primary']}; border-bottom: 2px solid {pal['accent']}; padding-bottom: 3mm; }}
-    .toc-row {{ display: flex; padding: 2.4mm 0; border-bottom: 1px dotted #ccc; }}
+    .colophon {{ padding-top: 90mm; }}
+    .colophon .ref-title {{ font-size: 11pt; color: {pal['primary']}; font-weight: 700; margin-bottom: 2mm; }}
+    .disclaimer {{ font-size: 9.5pt; color: #6b6f76; margin-top: 8mm; border-top: 1px solid {pal['accent']}; padding-top: 6mm; max-width: 120mm; }}
+
+    /* ---------- TOC ---------- */
+    .toc-title-h {{ color: {pal['primary']}; border-bottom: 2px solid {pal['accent']}; padding-bottom: 3mm; margin-bottom: 6mm; }}
+    .toc-row {{ display: flex; padding: 2.6mm 0; border-bottom: 1px dotted #ccc; }}
     .toc-num {{ color: {pal['accent']}; font-weight: 700; width: 12mm; }}
     .toc-title {{ color: {pal['text']}; }}
+
+    /* ---------- CHAPTER OPENER ---------- */
     .chapter {{ page-break-before: always; }}
-    .chapter-head {{ margin-bottom: 6mm; border-bottom: 2px solid {pal['primary']}; padding-bottom: 3mm; }}
+    .chapter-head {{ margin-bottom: 8mm; padding-bottom: 5mm; border-bottom: 1.5px solid {pal['border'] if pal.get('border') else '#E6E2D8'}; position: relative; }}
+    .chapter-num-badge {{ position: absolute; top: -2mm; right: 0; font-family: {heading_font}; font-size: 30pt; font-weight: 700; color: {pal['accent']}; opacity: 0.22; line-height: 1; }}
     .chapter-kicker {{ text-transform: uppercase; letter-spacing: 2px; font-size: 9pt; color: {pal['accent']}; font-weight: 700; }}
-    .chapter h2 {{ font-size: 20pt; margin: 2mm 0 0 0; }}
-    .chapter h3 {{ font-size: 13pt; color: {pal['primary']}; margin-top: 6mm; }}
+    .chapter h2 {{ font-size: 21pt; margin: 2mm 0 0 0; max-width: 85%; }}
+    .chapter-dek {{ font-size: 11pt; color: {pal['muted'] if pal.get('muted') else '#6b6f76'}; margin-top: 2mm; font-style: italic; max-width: 90%; }}
+    .chapter h3 {{ font-size: 13pt; color: {pal['primary']}; margin-top: 7mm; margin-bottom: 2mm; }}
     .chapter h4 {{ font-size: 11.5pt; color: {pal['secondary']}; margin: 0 0 2mm 0; }}
-    .illo img {{ width: 100%; max-height: 110mm; object-fit: cover; border-radius: 6px; margin-bottom: 5mm; }}
-    p {{ margin: 0 0 3mm 0; }}
-    ul, ol {{ margin: 0 0 3mm 5mm; }}
-    table {{ width: 100%; border-collapse: collapse; margin: 4mm 0; font-size: 10.5pt; }}
-    th {{ background: {pal['primary']}; color: #fff; text-align: left; padding: 2.4mm 3mm; }}
-    td {{ border: 1px solid {pal['border'] if pal.get('border') else '#E6E2D8'}; padding: 2.2mm 3mm; }}
+    .illo {{ page-break-inside: avoid; margin: 5mm 0 6mm 0; text-align: center; }}
+    .illo img {{ width: 100%; max-height: 100mm; object-fit: contain; background: #fff; border: 1px solid {pal['border'] if pal.get('border') else '#E6E2D8'}; border-radius: 6px; padding: 4mm; }}
+    p {{ margin: 0 0 3.2mm 0; }}
+    ul, ol {{ margin: 0 0 3.2mm 5mm; }}
+
+    /* ---------- TABLES ---------- */
+    table {{ width: 100%; border-collapse: collapse; margin: 4.5mm 0; font-size: 10.5pt; page-break-inside: auto; }}
+    tr {{ page-break-inside: avoid; }}
+    th {{ background: {pal['primary']}; color: #fff; text-align: left; padding: 2.6mm 3mm; }}
+    td {{ border: 1px solid {pal['border'] if pal.get('border') else '#E6E2D8'}; padding: 2.4mm 3mm; }}
     tr:nth-child(even) td {{ background: #f6f4ee; }}
-    .callout {{ background: #eef7f6; border-left: 4px solid {pal['primary']}; padding: 4mm 5mm; border-radius: 4px; margin: 4mm 0; }}
-    .example {{ background: #faf1e6; border-left: 4px solid {pal['accent']}; padding: 4mm 5mm; border-radius: 4px; margin: 4mm 0; }}
-    .action-steps {{ background: #f4f6f8; border: 1px solid #dfe3e8; padding: 4mm 5mm; border-radius: 6px; margin: 4mm 0; }}
-    .exercise {{ background: #fff; border: 1.5px dashed {pal['primary']}; padding: 4mm 5mm; border-radius: 6px; margin: 4mm 0; }}
-    .summary {{ background: {pal['secondary']}; color: #fff; padding: 4mm 5mm; border-radius: 6px; margin: 5mm 0; }}
-    .summary h4 {{ color: #fff; }}
-    .bonus {{ border: 1px solid #e6e2d8; border-radius: 6px; padding: 4mm 5mm; margin-bottom: 4mm; }}
+
+    /* ---------- EDITORIAL BLOCKS (varied weight, not repeated "colored box" spam) ---------- */
+    .callout {{ background: {pal['background']}; border-left: 3px solid {pal['primary']}; padding: 4mm 5mm; margin: 5mm 0; page-break-inside: avoid; }}
+    .pullquote {{ font-family: {heading_font}; font-style: italic; font-size: 15pt; color: {pal['primary']}; text-align: center; border-top: 1px solid {pal['accent']}; border-bottom: 1px solid {pal['accent']}; padding: 5mm 8mm; margin: 7mm 6mm; line-height: 1.4; page-break-inside: avoid; }}
+    .example {{ background: #fff; border: 1px solid {pal['border'] if pal.get('border') else '#E6E2D8'}; border-left: 3px solid {pal['accent']}; padding: 4mm 5mm; border-radius: 3px; margin: 5mm 0; page-break-inside: avoid; }}
+    .example h4 {{ margin-top: 0; }}
+    .action-steps {{ background: #f7f8f9; border: 1px solid #e2e5e9; padding: 4.5mm 5.5mm; border-radius: 6px; margin: 5mm 0; page-break-inside: avoid; }}
+    .exercise {{ background: #fff; border: 1.4px dashed {pal['primary']}; padding: 4.5mm 5.5mm; border-radius: 6px; margin: 5mm 0; page-break-inside: avoid; }}
+    .answer-guide {{ background: {pal['background']}; border-radius: 4px; padding: 3mm 4mm; margin-top: 3mm; font-size: 10.2pt; }}
+    .summary {{ background: {pal['secondary']}; color: #fff; padding: 4.5mm 5.5mm; border-radius: 6px; margin: 6mm 0 0 0; page-break-inside: avoid; }}
+    .summary h4 {{ color: #fff; margin-top: 0; }}
+    .bonus {{ border: 1px solid {pal['border'] if pal.get('border') else '#E6E2D8'}; border-radius: 6px; padding: 4mm 5mm; margin-bottom: 4mm; page-break-inside: avoid; }}
     .bonus h3 {{ color: {pal['primary']}; margin: 0 0 2mm 0; }}
+
+    /* ---------- MATH NOTATION (reliable HTML/CSS-based; inline-block, NOT flexbox — WeasyPrint's
+       flexbox support is unreliable for inline-flex and breaks fractions onto separate lines) ---------- */
+    .equation {{ text-align: center; margin: 5mm 0; font-size: 13pt; }}
+    .frac {{ display: inline-block; vertical-align: middle; text-align: center; margin: 0 2px; line-height: 1.05; }}
+    .frac .num {{ display: block; padding: 0 2px 1px 2px; border-bottom: 1.3px solid currentColor; }}
+    .frac .den {{ display: block; padding: 1px 2px 0 2px; }}
+    .sqrt {{ display: inline-block; padding: 0 2px; border-top: 1.3px solid currentColor; position: relative; }}
+    .sqrt:before {{ content: '\\221A'; margin-right: 1px; }}
+    sup, sub {{ font-size: 75%; }}
 
     /* Screen-only "paper" look for the on-screen preview (ignored by WeasyPrint PDF print rendering) */
     @media screen {{
@@ -269,25 +300,29 @@ def build_ebook_html(ebook: dict, branding: dict, transformation: dict, cover_by
             box-shadow: 0 12px 36px rgba(0,0,0,0.16); padding: 20mm 18mm; border-radius: 3px;
         }}
         .page, .chapter {{ background: {pal['background']}; }}
-        .cover {{ height: auto; min-height: 297mm; padding: 30mm 22mm; }}
-        .cover-inner {{ position: static; inset: auto; padding: 0; height: 100%; min-height: 237mm; }}
+        .cover {{ height: auto; min-height: 297mm; padding: 0; }}
+        .cover-inner {{ padding: 24mm 20mm; height: 100%; min-height: 297mm; }}
         .page {{ min-height: 237mm; }}
         .chapter {{ min-height: auto; }}
     }}
     '''
 
-    doc = f'''<!DOCTYPE html><html lang="{product_language}"><head><meta charset="utf-8"><style>{css}</style></head><body>
-      <div class="cover"><div class="cover-inner">
-        <div class="brandbar"></div>
-        {cover_img}
-        <h1>{title}</h1>
-        <div class="sub">{subtitle}</div>
-        <div class="author">{(L["by"] + " " + author) if author else ""}</div>
-      </div></div>
+    cover_visual = f'<img class="cover-bg" src="data:{cover_mime};base64,{base64.b64encode(cover_bytes).decode()}" />' if cover_bytes else ""
 
-      <div class="page title-page">
-        <h1>{title}</h1>
-        <div class="sub">{subtitle}</div>
+    doc = f'''<!DOCTYPE html><html lang="{product_language}"><head><meta charset="utf-8"><style>{css}</style></head><body>
+      <div class="cover">
+        {cover_visual}
+        <div class="cover-scrim"></div>
+        <div class="cover-inner">
+          <div class="brandbar"></div>
+          <h1>{title}</h1>
+          <div class="sub">{subtitle}</div>
+          <div class="author">{(L["by"] + " " + author) if author else ""}</div>
+        </div>
+      </div>
+
+      <div class="page colophon">
+        <div class="ref-title">{title}</div>
         <div class="disclaimer">
           <p><strong>{title}</strong>{(" — " + author) if author else ""}</p>
           <p>{L['copyright']} &copy; {author or title}. {L['rights']}</p>

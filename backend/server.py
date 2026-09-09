@@ -510,7 +510,8 @@ async def ebook_section_rewrite(project_id: str, body: RewriteBody, user: dict =
     sec = next((s for s in (ebook.get("sections", []) if ebook else []) if s.get("chapter_num") == body.chapter_num), None)
     if not sec:
         raise HTTPException(status_code=404, detail="Section not generated yet")
-    new_html = await agents.rewrite_section(sec["content_html"], body.instruction, proj.get("product_language", "id"), proj.get("models_config", {}))
+    is_math = bool((ebook.get("meta") or {}).get("is_math_heavy"))
+    new_html = await agents.rewrite_section(sec["content_html"], body.instruction, proj.get("product_language", "id"), proj.get("models_config", {}), is_math)
     sec["content_html"] = new_html
     await save_project(project_id, {"ebook": ebook})
     proj["ebook"] = ebook
@@ -767,10 +768,11 @@ async def apply_qa(project_id: str, user: dict = Depends(get_current_user)):
     latest = qa[0]
     improvements = "; ".join(latest.get("recommended_improvements", [])[:6]) or "improve clarity, remove AI-sounding phrasing, tighten logic"
     ebook = proj["ebook"]
+    is_math = bool((ebook.get("meta") or {}).get("is_math_heavy"))
     # keep originals as versions
     for sec in ebook.get("sections", []):
         original = sec["content_html"]
-        new_html = await agents.rewrite_section(original, f"Apply these QA improvements: {improvements}", proj.get("product_language", "id"), proj.get("models_config", {}))
+        new_html = await agents.rewrite_section(original, f"Apply these QA improvements: {improvements}", proj.get("product_language", "id"), proj.get("models_config", {}), is_math)
         sec.setdefault("versions", []).append({"content_html": original, "saved_at": now_iso()})
         sec["content_html"] = new_html
     await save_project(project_id, {"ebook": ebook})
@@ -814,6 +816,33 @@ async def gen_bonuses(project_id: str, user: dict = Depends(get_current_user)):
     )
     data = await llm_json("cheap", proj.get("models_config", {}), system, prompt)
     return {"bonuses": data.get("bonuses", [])}
+
+
+@api.post("/projects/{project_id}/ebook/bonus/{index}/generate")
+async def ebook_bonus_generate(project_id: str, index: int, user: dict = Depends(get_current_user)):
+    """Turn a planned bonus (e.g. 'Study Tracker') into an ACTUAL downloadable XLSX asset,
+    using the same canonical palette as the rest of the product."""
+    proj = await load_project(project_id)
+    check_access(proj, user)
+    ebook = proj.get("ebook")
+    if not ebook:
+        raise HTTPException(status_code=400, detail="No ebook yet")
+    bonuses = ebook.get("bonuses", []) or []
+    if index < 0 or index >= len(bonuses):
+        raise HTTPException(status_code=404, detail="Bonus not found")
+    bonus = bonuses[index]
+    spec = await agents.generate_bonus_asset_spec(bonus, ebook.get("meta", {}), proj.get("transformation"), proj.get("product_language", "id"), proj.get("models_config", {}))
+    palette = (proj.get("transformation") or {}).get("palette", {})
+    xlsx_bytes = exporters.build_xlsx(spec, palette)
+    safe = "".join([c if c.isalnum() else "_" for c in (bonus.get("title") or "bonus")])[:40] or f"bonus_{index}"
+    asset = _register_asset(proj, "bonus", f"{safe}.xlsx", xlsx_bytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", key=f"bonus_{index}")
+    bonus["asset_id"] = asset["id"]
+    bonus["generated"] = True
+    bonuses[index] = bonus
+    ebook["bonuses"] = bonuses
+    await save_project(project_id, {"ebook": ebook, "assets": proj["assets"]})
+    proj["ebook"] = ebook
+    return serialize_doc(proj)
 
 
 # ---------------------------------------------------------------------------
