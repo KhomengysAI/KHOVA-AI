@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { useLang } from '@/lib/i18n';
-import { genBranding } from '@/lib/api';
+import { genBranding, setPalette } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { PalettePicker, PALETTE_PRESETS } from '@/components/PalettePicker';
 import { Working } from '@/components/Loading';
 import { Palette, ArrowRight, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
@@ -11,12 +12,16 @@ import { toast } from 'sonner';
 const STYLES = ['Minimal', 'Professional', 'Modern', 'Premium', 'Editorial', 'Bold'];
 
 export default function BrandingStep({ project, setProject, goTo, ensureAuth }) {
-  const { t } = useLang();
+  const { t, lang } = useLang();
   const [style, setStyle] = useState((project.branding && project.branding.style) || 'Premium');
   const [busy, setBusy] = useState(false);
   const b = project.branding;
+  // Canonical palette lives on the transformation object and is the single
+  // source of truth propagated into cover/PDF/website/spreadsheet exports.
+  const palette = (project.transformation && project.transformation.palette) || PALETTE_PRESETS[0].c;
 
-  const gen = () => { if (!ensureAuth(gen)) return; (async () => { setBusy(true); try { const p = await genBranding(project.id, style); setProject(p); toast.success('Branding dibuat'); } catch (e) { toast.error(e?.response?.data?.detail || 'Gagal.'); } finally { setBusy(false); } })(); };
+  const gen = () => { if (!ensureAuth(gen)) return; (async () => { setBusy(true); try { const p = await genBranding(project.id, style); setProject(p); toast.success(t('toast.brand.done')); } catch (e) { toast.error(e?.response?.data?.detail || 'Gagal.'); } finally { setBusy(false); } })(); };
+  const savePalette = async (pal) => { const p = await setPalette(project.id, pal); setProject(p); };
 
   if (busy) return <Working label="Menyusun branding..." />;
 
@@ -24,7 +29,7 @@ export default function BrandingStep({ project, setProject, goTo, ensureAuth }) 
     return (
       <div className="max-w-2xl">
         <h2 className="font-display text-2xl mb-2">{t('branding.title')}</h2>
-        <p className="text-muted-foreground mb-6">Judul, subjudul, penulis, brand, arah visual, tipografi, nada, warna, dan konsep cover.</p>
+        <p className="text-muted-foreground mb-6">Judul, subjudul, penulis, brand, arah visual, tipografi, dan nada — menggunakan palet produk kanonis Anda.</p>
         <div className="flex items-center gap-3 mb-4"><span className="text-sm">Gaya:</span>
           <Select value={style} onValueChange={setStyle}><SelectTrigger className="w-44" data-testid="branding-style-selector"><SelectValue /></SelectTrigger><SelectContent>{STYLES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent></Select>
         </div>
@@ -56,13 +61,17 @@ export default function BrandingStep({ project, setProject, goTo, ensureAuth }) 
           </div>
           <p className="text-sm mt-3">{b.description}</p>
         </Card>
-        <Card className="p-5 bg-card">
-          <div className="text-sm font-medium mb-2">Palet warna</div>
+        <Card className="p-5 bg-card" data-testid="branding-canonical-palette">
+          <div className="flex items-center justify-between mb-1">
+            <div className="text-sm font-medium">{t('brand.palette.title')}</div>
+            <PalettePicker palette={palette} onChange={savePalette} lang={lang} label={t('brand.palette.edit')} triggerTestId="branding-palette-picker" />
+          </div>
+          <p className="text-xs text-muted-foreground mb-4">{t('brand.palette.desc')}</p>
           <div className="flex flex-wrap gap-2 mb-4">
-            {(b.colors || []).map((c, i) => (
-              <div key={i} className="text-center">
-                <div className="w-12 h-12 rounded-lg border border-border" style={{ background: c.hex }} />
-                <div className="text-[10px] font-mono mt-1">{c.hex}</div>
+            {Object.entries(palette).map(([k, hex]) => (
+              <div key={k} className="text-center">
+                <div className="w-12 h-12 rounded-lg border border-border" style={{ background: hex }} />
+                <div className="text-[10px] font-mono mt-1 capitalize">{k}</div>
               </div>
             ))}
           </div>

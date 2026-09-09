@@ -5,7 +5,7 @@ import { useLang } from '@/lib/i18n';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { LayoutDashboard, FolderKanban, Settings as SettingsIcon, Sparkles, Globe, LogOut, Plus } from 'lucide-react';
+import { LayoutDashboard, FolderKanban, Settings as SettingsIcon, Globe, LogOut, Plus } from 'lucide-react';
 
 export const AppShell = ({ children }) => {
   const { user, logout, setShowLogin } = useAuth();
@@ -28,9 +28,7 @@ export const AppShell = ({ children }) => {
       <header className="sticky top-0 z-40 bg-card border-b border-border">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-3">
           <Link to="/" className="flex items-center gap-2" data-testid="logo-link">
-            <div className="w-9 h-9 rounded-lg bg-primary flex items-center justify-center">
-              <Sparkles className="w-5 h-5 text-primary-foreground" />
-            </div>
+            <img src="/assets/khova-logo.png" alt="Khova AI" className="w-9 h-9 object-contain" data-testid="logo-image" />
             <span className="font-display text-xl">Khova AI</span>
           </Link>
 

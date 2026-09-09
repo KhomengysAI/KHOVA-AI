@@ -595,7 +595,7 @@ async def ebook_export(project_id: str, user: dict = Depends(get_current_user)):
         b, m = _asset_bytes(proj, aid)
         if b:
             illustrations[int(ch)] = (b, m)
-    html = exporters.build_ebook_html(ebook, proj.get("branding"), proj.get("transformation"), cover_bytes, cover_mime or "image/png", illustrations)
+    html = exporters.build_ebook_html(ebook, proj.get("branding"), proj.get("transformation"), cover_bytes, cover_mime or "image/png", illustrations, proj.get("product_language", "id"))
     pdf = exporters.html_to_pdf(html)
     title = (ebook.get("meta", {}) or {}).get("title", "ebook")
     safe = "".join([c if c.isalnum() else "_" for c in title])[:40] or "ebook"
@@ -619,7 +619,7 @@ async def ebook_preview_html(project_id: str, user: Optional[dict] = Depends(get
         b, m = _asset_bytes(proj, aid)
         if b:
             illustrations[int(ch)] = (b, m)
-    html = exporters.build_ebook_html(ebook, proj.get("branding"), proj.get("transformation"), cover_bytes, cover_mime or "image/png", illustrations)
+    html = exporters.build_ebook_html(ebook, proj.get("branding"), proj.get("transformation"), cover_bytes, cover_mime or "image/png", illustrations, proj.get("product_language", "id"))
     return HTMLResponse(content=html)
 
 
@@ -692,7 +692,7 @@ async def website_build(project_id: str, user: dict = Depends(get_current_user))
     if not web or not web.get("spec"):
         raise HTTPException(status_code=400, detail="Generate the website spec first")
     palette = (proj.get("transformation") or {}).get("palette", {})
-    html = exporters.build_website_html(web["spec"], palette, web.get("style", "Modern"))
+    html = exporters.build_website_html(web["spec"], palette, web.get("style", "Modern"), proj.get("product_language", "id"))
     web["html"] = html
     asset = _register_asset(proj, "html", "website.html", html.encode("utf-8"), "text/html", key="website")
     web["asset_id"] = asset["id"]

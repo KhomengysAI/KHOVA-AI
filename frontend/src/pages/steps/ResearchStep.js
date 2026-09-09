@@ -23,7 +23,12 @@ export default function ResearchStep({ project, setProject, goTo }) {
 
   const run = async () => {
     setBusy(true);
-    try { const p = await runResearch(project.id); setProject(p); }
+    try {
+      const p = await runResearch(project.id);
+      setProject(p);
+      if (p.research?.status === 'unavailable') toast.warning(t('toast.research.unavailable'));
+      else toast.success(t('toast.research.done', { n: (p.research?.findings || []).length, s: (p.research?.sources || []).length }));
+    }
     catch (e) { toast.error('Riset gagal. Coba lagi.'); }
     finally { setBusy(false); }
   };

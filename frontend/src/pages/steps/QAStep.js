@@ -17,8 +17,16 @@ export default function QAStep({ project, setProject, goTo, ensureAuth }) {
   const [applying, setApplying] = useState(false);
   const report = (project.qa || [])[0];
 
-  const run = () => { if (!ensureAuth(run)) return; (async () => { setBusy(true); try { const p = await runQA(project.id); setProject(p); toast.success('QA selesai'); } catch (e) { toast.error(e?.response?.data?.detail || 'Gagal QA.'); } finally { setBusy(false); } })(); };
-  const apply = async () => { setApplying(true); try { const p = await applyQA(project.id); setProject(p); toast.success('Perbaikan diterapkan (versi asli disimpan)'); } catch (e) { toast.error(e?.response?.data?.detail || 'Gagal.'); } finally { setApplying(false); } };
+  const run = () => { if (!ensureAuth(run)) return; (async () => { setBusy(true); try { const p = await runQA(project.id); setProject(p); toast.success(t('toast.qa.done', { n: p.qa?.[0]?.overall })); } catch (e) { toast.error(e?.response?.data?.detail || 'Gagal QA.'); } finally { setBusy(false); } })(); };
+  const apply = async () => {
+    setApplying(true);
+    try {
+      const p = await applyQA(project.id);
+      setProject(p);
+      toast.success(t('toast.qa.apply.done'), { action: { label: t('toast.qa.apply.open'), onClick: () => goTo('create') } });
+    } catch (e) { toast.error(e?.response?.data?.detail || 'Gagal.'); }
+    finally { setApplying(false); }
+  };
 
   if (busy) return <Working label="Memeriksa kualitas konten..." sub="Kontradiksi, pengulangan, logika, klaim, dan keselarasan transformasi." />;
 

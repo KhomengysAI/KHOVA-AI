@@ -30,6 +30,35 @@ const DICT = {
     'auth.title': 'Masuk untuk membuat & menyimpan produk Anda', 'auth.google': 'Lanjut dengan Google', 'auth.desc': 'Simpan progres Anda dan ekspor aset digital nyata.',
     'dash.title': 'Dashboard', 'dash.welcome': 'Selamat datang', 'projects.title': 'Proyek Saya', 'projects.empty': 'Belum ada proyek. Mulai buat produk pertama Anda!',
     'settings.title': 'Pengaturan', 'settings.uilang': 'Bahasa Aplikasi', 'settings.productlang': 'Bahasa Produk', 'settings.models': 'Model AI per Agen',
+    'settings.langcard': 'Bahasa / Language',
+    'dash.hero.sub': 'Ceritakan idemu, atau biarkan Khova AI membantu menemukannya lewat riset pasar.',
+    'dash.recent': 'Proyek Terbaru', 'dash.stats.total': 'Total Proyek', 'dash.stats.complete': 'Selesai', 'dash.stats.progress': 'Dalam proses',
+    'dash.viewall': 'Lihat semua',
+    'opp.viewdetails': 'Lihat detail', 'opp.close': 'Tutup',
+    'opp.detail.target': 'Target Pelanggan', 'opp.detail.problem': 'Masalah', 'opp.detail.outcome': 'Mengapa Ini Penting',
+    'opp.detail.evidence': 'Bukti / Riset Pasar', 'opp.detail.alternatives': 'Konteks Pasar & Alternatif',
+    'opp.detail.gap': 'Peluang Diferensiasi', 'opp.detail.concept': 'Arah Produk Potensial', 'opp.detail.confidence': 'Status Keyakinan',
+    'opp.confidence.researched': 'Berbasis riset pasar', 'opp.confidence.hypothesis': 'Hipotesis AI (riset terbatas)',
+    'score.how': 'Cara kerja skor', 'score.how.desc': 'Setiap peluang diberi skor 1-10 pada 6 dimensi berikut, dirata-ratakan menjadi Skor Keseluruhan.',
+    'score.desc.pain': 'Seberapa menyakitkan masalah ini dirasakan pelanggan saat ini.',
+    'score.desc.worsening': 'Apakah masalah ini makin mendesak / memburuk dari waktu ke waktu.',
+    'score.desc.purchasing_power': 'Apakah audiens punya kemampuan & kemauan membayar solusi.',
+    'score.desc.speed': 'Seberapa cepat pelanggan bisa merasakan hasil dari solusi ini.',
+    'score.desc.market_validation': 'Seberapa kuat bukti bahwa orang sudah membeli solusi serupa.',
+    'score.desc.differentiation': 'Seberapa besar peluang untuk tampil berbeda secara berarti dari yang sudah ada.',
+    'brand.palette.title': 'Palet Produk (Kanonis)', 'brand.palette.desc': 'Palet ini otomatis dipakai di cover, PDF, website, dan semua aset — ubah di sini akan diterapkan ke semuanya.',
+    'brand.palette.edit': 'Ubah Palet',
+    'toast.research.done': 'Riset pasar selesai. {n} temuan & {s} sumber ditemukan.',
+    'toast.research.unavailable': 'Riset web tidak tersedia — temuan di bawah adalah hipotesis AI, bukan hasil riset.',
+    'toast.opp.done': '{n} peluang produk ditemukan dan diberi skor. Bandingkan lalu pilih salah satu.',
+    'toast.trans.done': 'Peta transformasi dibuat. Tinjau & sesuaikan palet produk jika perlu.',
+    'toast.brand.done': 'Branding dibuat. Lanjut ke Ekspor untuk membuat aset final.',
+    'toast.qa.done': 'QA selesai — skor keseluruhan {n}/10. Tinjau masalah di bawah.',
+    'toast.qa.apply.done': 'Perbaikan diterapkan ke semua bab. Versi asli tersimpan di riwayat.',
+    'toast.qa.apply.open': 'Buka eBook',
+    'toast.export.pdf': 'PDF final dibuat. Klik Unduh PDF untuk menyimpannya.',
+    'toast.export.xlsx': 'XLSX dibuat. Klik Unduh XLSX untuk menyimpannya.',
+    'toast.export.site': 'Website dibuat. Buka untuk melihat hasilnya secara langsung.',
   },
   en: {
     'nav.dashboard': 'Dashboard', 'nav.new': 'New Product', 'nav.projects': 'Projects', 'nav.settings': 'Settings',
@@ -60,6 +89,35 @@ const DICT = {
     'auth.title': 'Sign in to create & save your product', 'auth.google': 'Continue with Google', 'auth.desc': 'Save your progress and export real digital assets.',
     'dash.title': 'Dashboard', 'dash.welcome': 'Welcome', 'projects.title': 'My Projects', 'projects.empty': 'No projects yet. Start your first product!',
     'settings.title': 'Settings', 'settings.uilang': 'App Language', 'settings.productlang': 'Product Language', 'settings.models': 'AI Model per Agent',
+    'settings.langcard': 'Language',
+    'dash.hero.sub': 'Describe your idea, or let Khova AI help discover one through market research.',
+    'dash.recent': 'Recent Projects', 'dash.stats.total': 'Total Projects', 'dash.stats.complete': 'Complete', 'dash.stats.progress': 'In progress',
+    'dash.viewall': 'View all',
+    'opp.viewdetails': 'View details', 'opp.close': 'Close',
+    'opp.detail.target': 'Target Customer', 'opp.detail.problem': 'Problem', 'opp.detail.outcome': 'Why This Matters',
+    'opp.detail.evidence': 'Evidence / Market Research', 'opp.detail.alternatives': 'Market Context & Alternatives',
+    'opp.detail.gap': 'Differentiation Opportunity', 'opp.detail.concept': 'Potential Product Direction', 'opp.detail.confidence': 'Confidence Status',
+    'opp.confidence.researched': 'Backed by market research', 'opp.confidence.hypothesis': 'AI hypothesis (limited research)',
+    'score.how': 'How scoring works', 'score.how.desc': 'Each opportunity is scored 1-10 on the 6 dimensions below, averaged into the Overall Score.',
+    'score.desc.pain': 'How painful this problem currently feels to customers.',
+    'score.desc.worsening': 'Whether this problem is becoming more urgent / worse over time.',
+    'score.desc.purchasing_power': "Whether the audience has the ability & willingness to pay for a solution.",
+    'score.desc.speed': 'How quickly a customer can feel results from this solution.',
+    'score.desc.market_validation': 'How strong the evidence is that people already buy similar solutions.',
+    'score.desc.differentiation': 'How much room there is to stand out meaningfully from existing options.',
+    'brand.palette.title': 'Product Palette (Canonical)', 'brand.palette.desc': 'This palette is automatically used across the cover, PDF, website and all assets — edits here apply everywhere.',
+    'brand.palette.edit': 'Edit Palette',
+    'toast.research.done': 'Market research complete. {n} findings & {s} sources found.',
+    'toast.research.unavailable': 'Web research unavailable — findings below are AI hypotheses, not research results.',
+    'toast.opp.done': '{n} product opportunities found and scored. Compare, then select one.',
+    'toast.trans.done': 'Transformation map created. Review it and adjust the product palette if needed.',
+    'toast.brand.done': 'Branding created. Continue to Export to generate the final assets.',
+    'toast.qa.done': 'QA complete — overall score {n}/10. Review the issues below.',
+    'toast.qa.apply.done': 'Improvements applied to all chapters. Original versions saved in history.',
+    'toast.qa.apply.open': 'Open eBook',
+    'toast.export.pdf': 'Final PDF generated. Click Download PDF to save it.',
+    'toast.export.xlsx': 'XLSX generated. Click Download XLSX to save it.',
+    'toast.export.site': 'Website generated. Open it to see the live result.',
   },
 };
 
@@ -68,7 +126,13 @@ const LangContext = createContext(null);
 export const LanguageProvider = ({ children }) => {
   const [lang, setLangState] = useState(() => localStorage.getItem('khova_ui_lang') || 'id');
   const setLang = useCallback((l) => { localStorage.setItem('khova_ui_lang', l); setLangState(l); }, []);
-  const t = useCallback((key) => (DICT[lang] && DICT[lang][key]) || (DICT.en[key]) || key, [lang]);
+  const t = useCallback((key, vars) => {
+    let str = (DICT[lang] && DICT[lang][key]) || (DICT.en[key]) || key;
+    if (vars) {
+      Object.entries(vars).forEach(([k, v]) => { str = str.replace(new RegExp(`\\{${k}\\}`, 'g'), v); });
+    }
+    return str;
+  }, [lang]);
   return <LangContext.Provider value={{ lang, setLang, t }}>{children}</LangContext.Provider>;
 };
 

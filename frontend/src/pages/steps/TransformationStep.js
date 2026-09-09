@@ -2,33 +2,23 @@ import React, { useState, useEffect } from 'react';
 import { useLang } from '@/lib/i18n';
 import { genTransformation, patchProject, setPalette } from '@/lib/api';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Card } from '@/components/ui/card';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { PalettePicker, PALETTE_PRESETS } from '@/components/PalettePicker';
 import { Working } from '@/components/Loading';
-import { Wand2, ArrowRight, ArrowLeft, RefreshCw, Save, Palette } from 'lucide-react';
+import { Wand2, ArrowRight, RefreshCw, Save } from 'lucide-react';
 import { toast } from 'sonner';
 
-const PALETTE_KEYS = [['primary', 'Primer'], ['secondary', 'Sekunder'], ['accent', 'Aksen'], ['background', 'Latar'], ['text', 'Teks']];
-const PRESETS = [
-  { name: 'Ocean', c: { primary: '#0B6E6B', secondary: '#111C2E', accent: '#C07A2B', background: '#FBFAF7', text: '#0B1220' } },
-  { name: 'Royal', c: { primary: '#1E3A8A', secondary: '#0F172A', accent: '#D97706', background: '#F8FAFC', text: '#0F172A' } },
-  { name: 'Forest', c: { primary: '#166534', secondary: '#14532D', accent: '#CA8A04', background: '#F7FEE7', text: '#1A2E05' } },
-  { name: 'Rose', c: { primary: '#9F1239', secondary: '#4C0519', accent: '#0F766E', background: '#FFF1F2', text: '#1F2937' } },
-  { name: 'Slate', c: { primary: '#334155', secondary: '#0F172A', accent: '#EA580C', background: '#F8FAFC', text: '#0F172A' } },
-];
-
 export default function TransformationStep({ project, setProject, goTo }) {
-  const { t } = useLang();
+  const { t, lang } = useLang();
   const [busy, setBusy] = useState(false);
   const [tr, setTr] = useState(project.transformation || null);
   useEffect(() => { setTr(project.transformation || null); }, [project.transformation]);
 
   const gen = async () => {
     setBusy(true);
-    try { const p = await genTransformation(project.id); setProject(p); setTr(p.transformation); }
+    try { const p = await genTransformation(project.id); setProject(p); setTr(p.transformation); toast.success(t('toast.trans.done')); }
     catch (e) { toast.error('Gagal. Pastikan positioning sudah dibuat.'); }
     finally { setBusy(false); }
   };
@@ -36,7 +26,7 @@ export default function TransformationStep({ project, setProject, goTo }) {
   const savePalette = async (pal) => { const np = { ...tr, palette: pal }; setTr(np); const p = await setPalette(project.id, pal); setProject(p); };
   const setCat = (i, field, v) => setTr(o => { const cats = [...o.categories]; cats[i] = { ...cats[i], [field]: v }; return { ...o, categories: cats }; });
   const setField = (k, v) => setTr(o => ({ ...o, [k]: v }));
-  const palette = (tr && tr.palette) || PRESETS[0].c;
+  const palette = (tr && tr.palette) || PALETTE_PRESETS[0].c;
 
   if (busy) return <Working label="Memetakan transformasi viseral..." />;
 
@@ -55,32 +45,7 @@ export default function TransformationStep({ project, setProject, goTo }) {
       <div className="flex items-center justify-between gap-3 mb-4 flex-wrap">
         <h2 className="font-display text-2xl">{t('trans.title')}</h2>
         <div className="flex gap-2 flex-wrap">
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button variant="secondary" size="sm" className="gap-1" data-testid="product-palette-picker"><Palette className="w-3.5 h-3.5" /> {t('trans.palette')}</Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-80">
-              <div className="space-y-3">
-                <div className="flex flex-wrap gap-2">
-                  {PRESETS.map(p => (
-                    <button key={p.name} onClick={() => savePalette(p.c)} className="flex items-center gap-1 border border-border rounded-full pl-1 pr-2 py-1 hover:bg-secondary">
-                      <span className="w-4 h-4 rounded-full" style={{ background: p.c.primary }} />
-                      <span className="text-xs">{p.name}</span>
-                    </button>
-                  ))}
-                </div>
-                <div className="space-y-2">
-                  {PALETTE_KEYS.map(([k, lbl]) => (
-                    <div key={k} className="flex items-center gap-2">
-                      <input type="color" value={palette[k] || '#000000'} onChange={e => savePalette({ ...palette, [k]: e.target.value })} className="w-8 h-8 rounded border border-border p-0" data-testid={`palette-${k}`} />
-                      <span className="text-xs w-20">{lbl}</span>
-                      <Input value={palette[k] || ''} onChange={e => savePalette({ ...palette, [k]: e.target.value })} className="h-8 font-mono text-xs" />
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </PopoverContent>
-          </Popover>
+          <PalettePicker palette={palette} onChange={savePalette} lang={lang} label={t('trans.palette')} />
           <Button variant="secondary" size="sm" onClick={gen} className="gap-1"><RefreshCw className="w-3.5 h-3.5" /> {t('common.regenerate')}</Button>
           <Button variant="secondary" size="sm" onClick={save} className="gap-1" data-testid="transformation-save"><Save className="w-3.5 h-3.5" /> {t('common.save')}</Button>
           <Button size="sm" onClick={() => goTo('format')} className="gap-1" data-testid="transformation-continue">{t('common.continue')} <ArrowRight className="w-3.5 h-3.5" /></Button>

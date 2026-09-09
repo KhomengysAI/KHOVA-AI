@@ -16,6 +16,96 @@ DEFAULT_PALETTE = {
     "text": "#0B1220",
 }
 
+# Structural "chrome" strings for generated documents/pages. These are NOT
+# AI-generated content — they are fixed UI labels baked into exported
+# assets, so they must follow the selected Product Language explicitly
+# (this fixes the previous bug where these were hardcoded in Indonesian
+# regardless of product_language).
+LABELS = {
+    "id": {
+        "chapter": "Bab", "toc": "Daftar Isi", "introduction": "Pendahuluan",
+        "bonus_kicker": "Bonus", "bonus_title": "Materi Bonus",
+        "outcomes_intro": "Yang akan Anda kuasai:", "no_content": "Bagian ini belum dibuat.",
+        "copyright": "Hak Cipta", "rights": "Semua hak dilindungi. Konten ini disediakan untuk tujuan edukasi. Meskipun disusun dengan cermat, pembaca bertanggung jawab atas keputusan mereka sendiri.",
+        "before": "Sebelum", "after": "Sesudah", "get_started": "Mulai Sekarang",
+        "made_with": "Dibuat dengan Khova AI", "the_problem": "Masalahnya", "benefits": "Manfaat",
+        "how_it_works": "Cara Kerjanya", "whats_included": "Apa yang Anda Dapatkan",
+        "testimonials": "Kata Mereka", "testimonials_ph": "Testimoni akan tampil di sini.", "faq": "Tanya Jawab",
+        "by": "oleh",
+    },
+    "en": {
+        "chapter": "Chapter", "toc": "Table of Contents", "introduction": "Introduction",
+        "bonus_kicker": "Bonus", "bonus_title": "Bonus Materials",
+        "outcomes_intro": "What you'll master:", "no_content": "This section has not been written yet.",
+        "copyright": "Copyright", "rights": "All rights reserved. This content is provided for educational purposes. While carefully prepared, readers are responsible for their own decisions.",
+        "before": "Before", "after": "After", "get_started": "Get Started",
+        "made_with": "Made with Khova AI", "the_problem": "The Problem", "benefits": "Benefits",
+        "how_it_works": "How It Works", "whats_included": "What's Included",
+        "testimonials": "What People Say", "testimonials_ph": "Testimonials will appear here.", "faq": "FAQ",
+        "by": "by",
+    },
+    "es": {
+        "chapter": "Capítulo", "toc": "Índice", "introduction": "Introducción",
+        "bonus_kicker": "Bono", "bonus_title": "Materiales de Bono",
+        "outcomes_intro": "Lo que dominarás:", "no_content": "Esta sección aún no ha sido escrita.",
+        "copyright": "Derechos de autor", "rights": "Todos los derechos reservados. Este contenido se ofrece con fines educativos. El lector es responsable de sus propias decisiones.",
+        "before": "Antes", "after": "Después", "get_started": "Empezar Ahora",
+        "made_with": "Hecho con Khova AI", "the_problem": "El Problema", "benefits": "Beneficios",
+        "how_it_works": "Cómo Funciona", "whats_included": "Qué Incluye",
+        "testimonials": "Lo Que Dicen", "testimonials_ph": "Los testimonios aparecerán aquí.", "faq": "Preguntas Frecuentes",
+        "by": "por",
+    },
+    "fr": {
+        "chapter": "Chapitre", "toc": "Table des matières", "introduction": "Introduction",
+        "bonus_kicker": "Bonus", "bonus_title": "Contenus Bonus",
+        "outcomes_intro": "Ce que vous allez maîtriser :", "no_content": "Cette section n'a pas encore été rédigée.",
+        "copyright": "Droits d'auteur", "rights": "Tous droits réservés. Ce contenu est fourni à des fins éducatives. Le lecteur reste responsable de ses propres décisions.",
+        "before": "Avant", "after": "Après", "get_started": "Commencer",
+        "made_with": "Créé avec Khova AI", "the_problem": "Le Problème", "benefits": "Avantages",
+        "how_it_works": "Comment ça marche", "whats_included": "Ce qui est inclus",
+        "testimonials": "Ce Qu'ils Disent", "testimonials_ph": "Les témoignages apparaîtront ici.", "faq": "FAQ",
+        "by": "par",
+    },
+    "de": {
+        "chapter": "Kapitel", "toc": "Inhaltsverzeichnis", "introduction": "Einführung",
+        "bonus_kicker": "Bonus", "bonus_title": "Bonusmaterial",
+        "outcomes_intro": "Das wirst du beherrschen:", "no_content": "Dieser Abschnitt wurde noch nicht geschrieben.",
+        "copyright": "Urheberrecht", "rights": "Alle Rechte vorbehalten. Dieser Inhalt dient Bildungszwecken. Die Leser sind für ihre eigenen Entscheidungen verantwortlich.",
+        "before": "Vorher", "after": "Nachher", "get_started": "Jetzt Starten",
+        "made_with": "Erstellt mit Khova AI", "the_problem": "Das Problem", "benefits": "Vorteile",
+        "how_it_works": "So funktioniert's", "whats_included": "Was enthalten ist",
+        "testimonials": "Das Sagen Kunden", "testimonials_ph": "Erfahrungsberichte erscheinen hier.", "faq": "FAQ",
+        "by": "von",
+    },
+    "pt": {
+        "chapter": "Capítulo", "toc": "Índice", "introduction": "Introdução",
+        "bonus_kicker": "Bônus", "bonus_title": "Materiais Bônus",
+        "outcomes_intro": "O que você vai dominar:", "no_content": "Esta seção ainda não foi escrita.",
+        "copyright": "Direitos de autor", "rights": "Todos os direitos reservados. Este conteúdo é fornecido para fins educacionais. O leitor é responsável por suas próprias decisões.",
+        "before": "Antes", "after": "Depois", "get_started": "Comece Agora",
+        "made_with": "Feito com Khova AI", "the_problem": "O Problema", "benefits": "Benefícios",
+        "how_it_works": "Como Funciona", "whats_included": "O Que Está Incluído",
+        "testimonials": "O Que Dizem", "testimonials_ph": "Os depoimentos aparecerão aqui.", "faq": "Perguntas Frequentes",
+        "by": "por",
+    },
+    "ja": {
+        "chapter": "第", "toc": "目次", "introduction": "はじめに",
+        "bonus_kicker": "ボーナス", "bonus_title": "ボーナス資料",
+        "outcomes_intro": "習得できること:", "no_content": "このセクションはまだ作成されていません。",
+        "copyright": "著作権", "rights": "全著作権所有。本コンテンツは教育目的で提供されています。読者は自身の判断に責任を負います。",
+        "before": "前", "after": "後", "get_started": "今すぐ始める",
+        "made_with": "Khova AI で作成", "the_problem": "課題", "benefits": "メリット",
+        "how_it_works": "仕組み", "whats_included": "含まれるもの",
+        "testimonials": "お客様の声", "testimonials_ph": "お客様の声がここに表示されます。", "faq": "よくある質問",
+        "by": "著者",
+    },
+}
+
+
+def _labels(product_language: str) -> dict:
+    return LABELS.get((product_language or "id").lower(), LABELS["en"])
+
+
 FONT_STACKS = {
     "serif": "Georgia, 'Times New Roman', serif",
     "sans": "Helvetica, Arial, sans-serif",
@@ -55,12 +145,13 @@ def design_consistency_check(design_system, transformation):
 # EBOOK -> PDF
 # ---------------------------------------------------------------------------
 def build_ebook_html(ebook: dict, branding: dict, transformation: dict, cover_bytes: bytes = None,
-                     cover_mime: str = "image/png", illustrations: dict = None):
+                     cover_mime: str = "image/png", illustrations: dict = None, product_language: str = "id"):
     """illustrations: {chapter_num: (bytes, mime)}"""
     ebook = ebook or {}
     meta = ebook.get("meta", {}) or {}
     design_system = ebook.get("design_system", {}) or {}
     pal = _palette(design_system, transformation)
+    L = _labels(product_language)
     heading_font = FONT_STACKS.get((design_system.get("typography") or "serif").lower(), FONT_STACKS["serif"])
     body_font = FONT_STACKS["sans"]
 
@@ -89,7 +180,7 @@ def build_ebook_html(ebook: dict, branding: dict, transformation: dict, cover_by
     for ch in toc:
         num = ch.get("chapter_num")
         sec = sections.get(num, {})
-        content = sec.get("content_html", "") or "<p><em>Bagian ini belum dibuat.</em></p>"
+        content = sec.get("content_html", "") or f"<p><em>{L['no_content']}</em></p>"
         illo = ""
         if num in illustrations and illustrations[num][0]:
             ib, imime = illustrations[num]
@@ -98,7 +189,7 @@ def build_ebook_html(ebook: dict, branding: dict, transformation: dict, cover_by
         chapters_html += f'''
         <section class="chapter">
           <div class="chapter-head">
-            <div class="chapter-kicker">Bab {num}</div>
+            <div class="chapter-kicker">{L['chapter']} {num}</div>
             <h2>{_html.escape(ch.get("title",""))}</h2>
           </div>
           {illo}
@@ -113,14 +204,14 @@ def build_ebook_html(ebook: dict, branding: dict, transformation: dict, cover_by
         items = ""
         for b in bonuses:
             items += f'<div class="bonus"><h3>{_html.escape(b.get("title",""))}</h3><p>{_html.escape(b.get("description",""))}</p></div>'
-        bonuses_html = f'<section class="chapter"><div class="chapter-head"><div class="chapter-kicker">Bonus</div><h2>Materi Bonus</h2></div>{items}</section>'
+        bonuses_html = f'<section class="chapter"><div class="chapter-head"><div class="chapter-kicker">{L["bonus_kicker"]}</div><h2>{L["bonus_title"]}</h2></div>{items}</section>'
 
     # Learning outcomes
     outcomes = meta.get("learning_outcomes") or []
     outcomes_html = ""
     if outcomes:
         lis = "".join([f"<li>{_html.escape(o)}</li>" for o in outcomes])
-        outcomes_html = f'<div class="callout"><strong>Yang akan Anda kuasai:</strong><ul>{lis}</ul></div>'
+        outcomes_html = f'<div class="callout"><strong>{L["outcomes_intro"]}</strong><ul>{lis}</ul></div>'
 
     css = f'''
     @page {{
@@ -169,15 +260,29 @@ def build_ebook_html(ebook: dict, branding: dict, transformation: dict, cover_by
     .summary h4 {{ color: #fff; }}
     .bonus {{ border: 1px solid #e6e2d8; border-radius: 6px; padding: 4mm 5mm; margin-bottom: 4mm; }}
     .bonus h3 {{ color: {pal['primary']}; margin: 0 0 2mm 0; }}
+
+    /* Screen-only "paper" look for the on-screen preview (ignored by WeasyPrint PDF print rendering) */
+    @media screen {{
+        body {{ background: #e9e7e2; padding: 32px 0 60px; }}
+        .cover, .page, .chapter {{
+            max-width: 210mm; margin: 0 auto 28px auto;
+            box-shadow: 0 12px 36px rgba(0,0,0,0.16); padding: 20mm 18mm; border-radius: 3px;
+        }}
+        .page, .chapter {{ background: {pal['background']}; }}
+        .cover {{ height: auto; min-height: 297mm; padding: 30mm 22mm; }}
+        .cover-inner {{ position: static; inset: auto; padding: 0; height: 100%; min-height: 237mm; }}
+        .page {{ min-height: 237mm; }}
+        .chapter {{ min-height: auto; }}
+    }}
     '''
 
-    doc = f'''<!DOCTYPE html><html><head><meta charset="utf-8"><style>{css}</style></head><body>
+    doc = f'''<!DOCTYPE html><html lang="{product_language}"><head><meta charset="utf-8"><style>{css}</style></head><body>
       <div class="cover"><div class="cover-inner">
         <div class="brandbar"></div>
         {cover_img}
         <h1>{title}</h1>
         <div class="sub">{subtitle}</div>
-        <div class="author">{("oleh " + author) if author else ""}</div>
+        <div class="author">{(L["by"] + " " + author) if author else ""}</div>
       </div></div>
 
       <div class="page title-page">
@@ -185,18 +290,17 @@ def build_ebook_html(ebook: dict, branding: dict, transformation: dict, cover_by
         <div class="sub">{subtitle}</div>
         <div class="disclaimer">
           <p><strong>{title}</strong>{(" — " + author) if author else ""}</p>
-          <p>Hak Cipta &copy; {author or title}. Semua hak dilindungi. Konten ini disediakan untuk tujuan edukasi.
-          Meskipun disusun dengan cermat, pembaca bertanggung jawab atas keputusan mereka sendiri.</p>
+          <p>{L['copyright']} &copy; {author or title}. {L['rights']}</p>
         </div>
       </div>
 
       <div class="page">
-        <h2 class="toc-title-h">Daftar Isi</h2>
+        <h2 class="toc-title-h">{L['toc']}</h2>
         {toc_rows}
       </div>
 
       <section class="chapter">
-        <div class="chapter-head"><div class="chapter-kicker">Pendahuluan</div><h2>Pendahuluan</h2></div>
+        <div class="chapter-head"><div class="chapter-kicker">{L['introduction']}</div><h2>{L['introduction']}</h2></div>
         {outcomes_html}
         {intro_html}
       </section>
@@ -362,9 +466,10 @@ STYLE_PRESETS = {
 }
 
 
-def build_website_html(spec: dict, palette: dict = None, style: str = "Modern") -> str:
+def build_website_html(spec: dict, palette: dict = None, style: str = "Modern", product_language: str = "id") -> str:
     spec = spec or {}
     pal = palette or DEFAULT_PALETTE
+    L = _labels(product_language)
     primary = pal.get("primary", "#0B6E6B")
     secondary = pal.get("secondary", "#111C2E")
     accent = pal.get("accent", "#C07A2B")
@@ -406,7 +511,7 @@ def build_website_html(spec: dict, palette: dict = None, style: str = "Modern") 
     included_list = li_list(included.get("items"))
 
     return f'''<!DOCTYPE html>
-<html lang="id"><head><meta charset="utf-8">
+<html lang="{product_language}"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{esc(brand)}</title>
 <style>
@@ -448,53 +553,53 @@ def build_website_html(spec: dict, palette: dict = None, style: str = "Modern") 
     <span class="brandbar">{esc(brand)}</span>
     <h1>{esc(hero.get("headline"))}</h1>
     <p>{esc(hero.get("subheadline"))}</p>
-    <a class="btn alt" href="#cta">{esc(hero.get("cta") or "Get Started")}</a>
+    <a class="btn alt" href="#cta">{esc(hero.get("cta") or L["get_started"])}</a>
   </div></header>
 
   <section class="muted"><div class="wrap">
-    <h2>{esc(problem.get("title") or "The Problem")}</h2>
+    <h2>{esc(problem.get("title") or L["the_problem"])}</h2>
     <p style="max-width:720px;margin-bottom:16px;">{esc(problem.get("body"))}</p>
     <ul>{li_list(problem.get("bullets"))}</ul>
   </div></section>
 
   <section><div class="wrap">
-    <h2>{esc(transformation.get("title") or "Your Transformation")}</h2>
+    <h2>{esc(transformation.get("title") or L["how_it_works"])}</h2>
     <div class="cols">
-      <div class="ba before"><h3>Sebelum</h3><ul>{before_list}</ul></div>
-      <div class="ba after"><h3>Sesudah</h3><ul>{after_list}</ul></div>
+      <div class="ba before"><h3>{L["before"]}</h3><ul>{before_list}</ul></div>
+      <div class="ba after"><h3>{L["after"]}</h3><ul>{after_list}</ul></div>
     </div>
   </div></section>
 
   <section class="muted"><div class="wrap">
-    <h2>{esc(benefits.get("title") or "Benefits")}</h2>
+    <h2>{esc(benefits.get("title") or L["benefits"])}</h2>
     <div class="grid">{benefit_cards}</div>
   </div></section>
 
   <section><div class="wrap">
-    <h2>{esc(included.get("title") or "What's Included")}</h2>
+    <h2>{esc(included.get("title") or L["whats_included"])}</h2>
     <ul>{included_list}</ul>
   </div></section>
 
   <section class="muted"><div class="wrap">
-    <h2>{esc(how.get("title") or "How It Works")}</h2>
+    <h2>{esc(how.get("title") or L["how_it_works"])}</h2>
     {step_cards}
   </div></section>
 
   <section><div class="wrap">
-    <h2>{esc(social.get("title") or "What People Say")}</h2>
-    <div class="social">{esc(social.get("placeholder") or "Testimonials will appear here.")}</div>
+    <h2>{esc(social.get("title") or L["testimonials"])}</h2>
+    <div class="social">{esc(social.get("placeholder") or L["testimonials_ph"])}</div>
   </div></section>
 
   <section class="muted"><div class="wrap">
-    <h2>{esc(faq.get("title") or "FAQ")}</h2>
+    <h2>{esc(faq.get("title") or L["faq"])}</h2>
     {faq_items}
   </div></section>
 
   <section class="cta-band" id="cta"><div class="wrap">
     <h2>{esc(final_cta.get("headline") or hero.get("headline"))}</h2>
     <p style="margin-bottom:26px;opacity:.9;">{esc(hero.get("subheadline"))}</p>
-    <a class="btn alt" href="#">{esc(final_cta.get("cta") or "Get Started")}</a>
+    <a class="btn alt" href="#">{esc(final_cta.get("cta") or L["get_started"])}</a>
   </div></section>
 
-  <footer><div class="wrap">&copy; {esc(brand)} — Dibuat dengan Khova AI</div></footer>
+  <footer><div class="wrap">&copy; {esc(brand)} — {L["made_with"]}</div></footer>
 </body></html>'''

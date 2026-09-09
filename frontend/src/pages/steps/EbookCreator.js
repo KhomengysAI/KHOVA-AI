@@ -90,13 +90,18 @@ export default function EbookCreator({ project, setProject, goTo, ensureAuth }) 
             {toc.map(ch => {
               const done = doneNums.has(ch.chapter_num);
               const working = genCh === ch.chapter_num;
+              const sec = sections.find(s => s.chapter_num === ch.chapter_num);
+              const hasVersions = sec && (sec.versions || []).length > 0;
               return (
                 <Card key={ch.chapter_num} className="p-4 bg-card">
                   <div className="flex items-center justify-between gap-3">
                     <div className="flex items-center gap-3 min-w-0">
                       <span className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-semibold shrink-0 ${done ? 'bg-primary text-primary-foreground' : 'bg-secondary text-muted-foreground'}`}>{done ? <Check className="w-3.5 h-3.5" /> : ch.chapter_num}</span>
                       <div className="min-w-0">
-                        <div className="font-medium text-sm truncate">{ch.title}</div>
+                        <div className="font-medium text-sm truncate flex items-center gap-1.5">
+                          {ch.title}
+                          {hasVersions && <Badge variant="outline" className="text-[9px]" data-testid={`ebook-chapter-improved-${ch.chapter_num}`}>Diperbaiki</Badge>}
+                        </div>
                         <div className="text-xs text-muted-foreground truncate">{ch.purpose}</div>
                       </div>
                     </div>

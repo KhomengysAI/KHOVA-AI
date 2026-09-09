@@ -19,9 +19,9 @@ export default function ExportStep({ project, setProject, ensureAuth }) {
   const assetOf = (type) => (project.assets || []).find(a => a.type === type);
   const pdf = assetOf('pdf'), xlsx = assetOf('xlsx'), html = assetOf('html');
 
-  const exportEbook = () => { if (!ensureAuth(exportEbook)) return; (async () => { setBusy(true); try { const r = await ebookExport(project.id); setProject(r.project); toast.success('PDF final dibuat'); } catch (e) { toast.error(e?.response?.data?.detail || 'Gagal ekspor PDF.'); } finally { setBusy(false); } })(); };
-  const buildXlsx = () => { if (!ensureAuth(buildXlsx)) return; (async () => { setBusy(true); try { const r = await spreadsheetBuild(project.id); setProject(r.project); toast.success('XLSX dibuat'); } catch (e) { toast.error('Gagal.'); } finally { setBusy(false); } })(); };
-  const buildSite = () => { if (!ensureAuth(buildSite)) return; (async () => { setBusy(true); try { const r = await websiteBuild(project.id); setProject(r.project); toast.success('Website dibuat'); } catch (e) { toast.error('Gagal.'); } finally { setBusy(false); } })(); };
+  const exportEbook = () => { if (!ensureAuth(exportEbook)) return; (async () => { setBusy(true); try { const r = await ebookExport(project.id); setProject(r.project); toast.success(t('toast.export.pdf')); } catch (e) { toast.error(e?.response?.data?.detail || 'Gagal ekspor PDF.'); } finally { setBusy(false); } })(); };
+  const buildXlsx = () => { if (!ensureAuth(buildXlsx)) return; (async () => { setBusy(true); try { const r = await spreadsheetBuild(project.id); setProject(r.project); toast.success(t('toast.export.xlsx')); } catch (e) { toast.error('Gagal.'); } finally { setBusy(false); } })(); };
+  const buildSite = () => { if (!ensureAuth(buildSite)) return; (async () => { setBusy(true); try { const r = await websiteBuild(project.id); setProject(r.project); toast.success(t('toast.export.site'), { action: { label: t('common.preview'), onClick: () => window.open(siteUrl(project.id), '_blank') } }); } catch (e) { toast.error('Gagal.'); } finally { setBusy(false); } })(); };
 
   if (busy) return <Working label="Menyiapkan aset final..." sub="Merender dokumen dengan design system Anda." />;
 

@@ -147,7 +147,10 @@ export default function Landing() {
 
       <footer className="border-t border-border">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 text-sm text-muted-foreground flex items-center justify-between">
-          <span className="font-display">Khova AI</span>
+          <span className="font-display flex items-center gap-2">
+            <img src="/assets/khova-logo.png" alt="Khova AI" className="w-6 h-6 object-contain" data-testid="footer-logo-image" />
+            Khova AI
+          </span>
           <span>Solusi untuk membangun produk digital Anda sendiri.</span>
         </div>
       </footer>

@@ -1,34 +1,18 @@
 [
   {
-    "content": "Phase 1: POC - all 5 primitives passed",
+    "content": "Phase 1 refinement: localization, dashboard, opportunities, palette, feedback, preview, QA",
     "status": "completed"
   },
   {
-    "content": "Phase 2: Design guidelines",
+    "content": "Visual design system re-theme to blue Khova identity",
     "status": "completed"
   },
   {
-    "content": "Phase 2: Backend - all agent endpoints + auth (validated)",
+    "content": "Run testing_agent_v3 full regression",
     "status": "completed"
   },
   {
-    "content": "Phase 2: Frontend infra + landing + shell + login modal",
-    "status": "completed"
-  },
-  {
-    "content": "Phase 2: Frontend creation wizard + 10 steps + previews/downloads",
-    "status": "completed"
-  },
-  {
-    "content": "Phase 2: Dashboard, projects, settings pages",
-    "status": "completed"
-  },
-  {
-    "content": "Phase 2: Sample project wired into UI",
-    "status": "completed"
-  },
-  {
-    "content": "Phase 2: End-to-end testing (21/22 passed) + fixed login modal auto-close/resume bug (verified)",
+    "content": "Verify product_language propagation live (en/id) via curl",
     "status": "completed"
   }
 ]
