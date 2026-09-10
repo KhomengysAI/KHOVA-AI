@@ -10,6 +10,7 @@ import logging
 from datetime import datetime, timezone, timedelta
 
 import httpx
+import pymongo
 from fastapi import APIRouter, Request, Response, HTTPException, Depends
 from pydantic import BaseModel
 
@@ -45,7 +46,16 @@ async def _create_or_update_user(email: str, name: str, picture: str = "") -> di
         "creations_used": 0,
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
-    await db.users.insert_one(dict(doc))
+    try:
+        await db.users.insert_one(dict(doc))
+    except pymongo.errors.DuplicateKeyError:
+        # Another concurrent call won the race and already created this user
+        # (relies on the unique index on users.email — see db.ensure_core_indexes).
+        existing = await db.users.find_one({"email": email}, {"_id": 0})
+        if existing:
+            return await billing.ensure_user_economy(existing)
+        # Extremely unlikely: index conflict but no readable doc yet — re-raise.
+        raise
     return doc
 
 
@@ -132,7 +142,9 @@ async def exchange_session(payload: SessionExchange, response: Response):
 
 @auth_router.post("/dev-login")
 async def dev_login(payload: DevLogin, response: Response):
-    """TEST-ONLY bypass. REMIND USER TO REMOVE BEFORE PRODUCTION."""
+    """TEST-ONLY bypass. Disabled unless KHOVA_ENABLE_DEV_LOGIN is explicitly set."""
+    if os.environ.get("KHOVA_ENABLE_DEV_LOGIN", "false").lower() not in ("1", "true", "yes"):
+        raise HTTPException(status_code=404)
     user = await _create_or_update_user(payload.email, payload.name, "")
     token = await _new_session(user["user_id"])
     _set_cookie(response, token)

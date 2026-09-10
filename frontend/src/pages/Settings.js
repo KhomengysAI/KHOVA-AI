@@ -39,7 +39,7 @@ export default function Settings() {
   const save = async () => {
     localStorage.setItem('khova_product_lang', productLang);
     try { await putSettings({ ui_language: lang, product_language: productLang }); toast.success(t('common.saved')); }
-    catch (e) { toast.success(t('common.saved')); }
+    catch (e) { toast.error(t('common.saveFailed') || 'Could not save settings'); }
   };
 
   const doRedeem = async () => {

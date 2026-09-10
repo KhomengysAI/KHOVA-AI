@@ -5,9 +5,40 @@ import json
 import logging
 import uuid
 
+import nh3
+
 from llm_service import llm_json, llm_text, research, lang_name
 
 logger = logging.getLogger("khova.agents")
+
+# Allowlist matches exactly the tag/class vocabulary the prompt's "Blocks:"
+# list in generate_ebook_section instructs the model to produce. Intentionally
+# excludes script/style/img/link/iframe/object/embed/form/on*-attribute
+# content: those are the SSRF (WeasyPrint fetching attacker-influenced remote
+# resources at PDF-export time) and stored-XSS (raw HTMLResponse preview
+# route) paths closed here. Illustrations are inserted separately in
+# exporters.py as a distinct `illo` block, not as part of this sanitized
+# content_html, so this allowlist does not need to permit <img>.
+_ALLOWED_HTML_TAGS = {
+    "p", "h3", "h4", "ul", "ol", "li", "table", "tr", "td", "th",
+    "strong", "em", "sup", "sub", "div", "span",
+}
+_ALLOWED_HTML_ATTRIBUTES = {
+    "div": {"class"},
+    "span": {"class"},
+}
+
+
+def _sanitize_html(html: str) -> str:
+    """Strip any tag/attribute outside the allowlist from AI-generated or
+    user-rewrite-instructed HTML before it is ever stored. Closes the SSRF
+    (WeasyPrint fetching attacker-influenced remote resources at PDF-export
+    time) and stored-XSS (raw HTMLResponse preview route) paths in one place,
+    at generation time, so every downstream consumer is automatically safe.
+    """
+    if not html:
+        return html
+    return nh3.clean(html, tags=_ALLOWED_HTML_TAGS, attributes=_ALLOWED_HTML_ATTRIBUTES)
 
 
 def _uid(prefix="op"):
@@ -406,7 +437,7 @@ async def generate_ebook_section(chapter, ebook_meta, transformation, product_la
             html = html.lstrip()[4:]
     for tag in ["<!DOCTYPE html>", "<html>", "</html>", "<body>", "</body>", "<head>", "</head>"]:
         html = html.replace(tag, "")
-    return html.strip()
+    return _sanitize_html(html.strip())
 
 
 async def rewrite_section(existing_html, instruction, product_language, models_config, is_math=False):
@@ -426,7 +457,7 @@ async def rewrite_section(existing_html, instruction, product_language, models_c
         html = html.split("```", 2)[1]
         if html.lstrip().lower().startswith("html"):
             html = html.lstrip()[4:]
-    return html.strip()
+    return _sanitize_html(html.strip())
 
 
 async def generate_introduction(ebook_meta, transformation, product_language, models_config):
@@ -439,7 +470,7 @@ async def generate_introduction(ebook_meta, transformation, product_language, mo
         "Return clean HTML paragraphs only (no wrapper, no markdown)."
     )
     html = await llm_text("writing", models_config, system, prompt)
-    return html.strip()
+    return _sanitize_html(html.strip())
 
 
 # ---------------------------------------------------------------------------

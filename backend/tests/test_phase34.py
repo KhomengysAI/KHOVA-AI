@@ -25,6 +25,12 @@ import asyncio
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+# This harness runs the app in-process via ASGITransport (no real network
+# origin involved), so it isn't the cross-origin-deployment scenario SEC-04's
+# CORS_ORIGINS fail-fast check guards against. Opt in explicitly rather than
+# letting `import server` below raise for an unset CORS_ORIGINS.
+os.environ.setdefault("KHOVA_ALLOW_WILDCARD_CORS", "true")
+
 import httpx
 
 import agents
@@ -287,6 +293,12 @@ async def main():
         os.environ["KHOVA_ANON_DEDUP_SEC"] = "0"
         os.environ["KHOVA_ANON_COOLDOWN_SEC"] = "60"
         os.environ["KHOVA_ANON_WINDOW_SEC"] = "3600"
+        # This in-process test harness sends X-Forwarded-For itself to simulate
+        # distinct client IPs (there's no real socket peer via ASGITransport),
+        # i.e. it plays the role of a trusted reverse proxy — so opt in to
+        # trusting that header for the duration of this test (see REL-01:
+        # ratelimit.client_ip() no longer trusts X-Forwarded-For by default).
+        os.environ["KHOVA_TRUST_PROXY_HEADERS"] = "true"
 
         anon_proj = (await c.post("/api/projects", json={"title": "Anon"})).json()
         apid = anon_proj["id"]; project_ids.append(apid)

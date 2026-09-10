@@ -11,9 +11,9 @@ from typing import Optional, List, Dict, Any
 from fastapi import FastAPI, APIRouter, HTTPException, Request, Depends, UploadFile, File
 from fastapi.responses import FileResponse, HTMLResponse, Response
 from starlette.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
-from db import db, serialize_doc, GENERATED_DIR
+from db import db, serialize_doc, GENERATED_DIR, ensure_core_indexes
 from auth import auth_router, get_current_user, get_optional_user
 import agents
 import exporters
@@ -21,8 +21,25 @@ import billing
 import jobs
 import model_router
 import ratelimit
-from llm_service import DEFAULT_MODELS, generate_image
+from llm_service import DEFAULT_MODELS, generate_image, SUPPORTED_LANGUAGES
 from agents import build_cover_prompt
+
+
+def _validate_language_code(v: Optional[str]) -> Optional[str]:
+    """Shared validator for product_language/ui_language fields.
+
+    Normalizes to lowercase and rejects anything outside SUPPORTED_LANGUAGES,
+    so an unsupported/garbage code is caught at the API boundary instead of
+    silently falling back to English labels deep in agents.py/exporters.py.
+    """
+    if v is None:
+        return v
+    normalized = v.lower()
+    if normalized not in SUPPORTED_LANGUAGES:
+        raise ValueError(
+            f"Unsupported language code {v!r}. Supported: {sorted(SUPPORTED_LANGUAGES)}"
+        )
+    return normalized
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 logger = logging.getLogger("khova")
@@ -170,10 +187,39 @@ async def save_project(project_id: str, updates: dict):
     await db.projects.update_one({"id": project_id}, {"$set": updates})
 
 
-async def claim_if_needed(proj: dict, user: dict):
-    if not proj.get("user_id"):
-        await db.projects.update_one({"id": proj["id"]}, {"$set": {"user_id": user["user_id"]}})
-        proj["user_id"] = user["user_id"]
+async def claim_if_needed(proj: dict, user: dict, request: Optional[Request] = None):
+    """Claim an unowned (anonymous) project for the now-authenticated caller.
+
+    SEC-06: an anonymous project is bound to the IP address that created it
+    (see create_project/_new_project_doc). Without this, ownership was
+    first-claimer-wins with no check at all — anyone who obtained another
+    visitor's anonymous project_id (a leaked link, a shared screenshot, a
+    referrer header) could sign up and instantly take permanent ownership of
+    that visitor's in-progress product, including everything generated on it
+    since. Claiming from a different IP than the one that created the
+    project is refused unless the caller is an admin.
+
+    Trade-off accepted deliberately: a legitimate visitor whose IP changes
+    between anonymous exploration and signing up (switching networks, VPN,
+    mobile data) will also be blocked here and need to start a fresh project.
+    That's a real but minor UX cost for closing a real account-takeover-style
+    vector; `creator_ip` is only set going forward, so projects created
+    before this fix (or where IP resolution failed) have no binding and keep
+    the previous first-claimer-wins behavior rather than locking anyone out
+    retroactively.
+    """
+    if proj.get("user_id"):
+        return
+    creator_ip = proj.get("creator_ip")
+    if creator_ip and creator_ip != "unknown" and user.get("role") != "admin":
+        if ratelimit.client_ip(request) != creator_ip:
+            raise HTTPException(
+                status_code=403,
+                detail="This product was started anonymously from a different session. "
+                       "Sign in from the same device/network to claim it, or start a new one.",
+            )
+    await db.projects.update_one({"id": proj["id"]}, {"$set": {"user_id": user["user_id"]}})
+    proj["user_id"] = user["user_id"]
 
 
 def _register_asset(proj: dict, kind: str, filename: str, data: bytes, mime: str, key: str = None) -> dict:
@@ -249,6 +295,8 @@ class SettingsBody(BaseModel):
     ui_language: Optional[str] = None
     product_language: Optional[str] = None
     models_config: Optional[Dict[str, Any]] = None
+
+    _validate_langs = field_validator("ui_language", "product_language")(_validate_language_code)
 
 
 @api.get("/settings")
@@ -445,11 +493,15 @@ class CreateProject(BaseModel):
     product_language: str = "id"
     models_config: Optional[Dict[str, Any]] = None
 
+    _validate_langs = field_validator("ui_language", "product_language")(_validate_language_code)
 
-def _new_project_doc(body: CreateProject, user: Optional[dict]) -> dict:
+
+def _new_project_doc(body: CreateProject, user: Optional[dict], creator_ip: Optional[str] = None) -> dict:
     return {
         "id": f"prj_{uuid.uuid4().hex[:12]}",
         "user_id": user["user_id"] if user else None,
+        # SEC-06: only recorded for anonymous creation — see claim_if_needed.
+        "creator_ip": None if user else creator_ip,
         "title": body.title or "Produk Baru",
         "status": "draft",
         "current_step": "discover",
@@ -475,8 +527,9 @@ def _new_project_doc(body: CreateProject, user: Optional[dict]) -> dict:
 
 
 @api.post("/projects")
-async def create_project(body: CreateProject, user: Optional[dict] = Depends(get_optional_user)):
-    doc = _new_project_doc(body, user)
+async def create_project(body: CreateProject, request: Request, user: Optional[dict] = Depends(get_optional_user)):
+    creator_ip = ratelimit.client_ip(request) if not user else None
+    doc = _new_project_doc(body, user, creator_ip)
     await db.projects.insert_one(dict(doc))
     return serialize_doc(doc)
 
@@ -511,6 +564,8 @@ class PatchProject(BaseModel):
     models_config: Optional[Dict[str, Any]] = None
     positioning: Optional[Dict[str, Any]] = None
     transformation: Optional[Dict[str, Any]] = None
+
+    _validate_langs = field_validator("ui_language", "product_language")(_validate_language_code)
 
 
 @api.patch("/projects/{project_id}")
@@ -729,10 +784,10 @@ def _require_pipeline(proj):
 
 # ----- EBOOK -----
 @api.post("/projects/{project_id}/ebook/plan")
-async def ebook_plan(project_id: str, user: dict = Depends(get_current_user)):
+async def ebook_plan(project_id: str, request: Request, user: dict = Depends(get_current_user)):
     proj = await load_project(project_id)
     check_access(proj, user)
-    await claim_if_needed(proj, user)
+    await claim_if_needed(proj, user, request)
     opp = _require_pipeline(proj)
     async def _do():
         return await agents.generate_ebook_plan(opp, proj["positioning"], proj["transformation"], proj.get("product_language", "id"), {})
@@ -953,10 +1008,10 @@ async def ebook_design_check(project_id: str, user: Optional[dict] = Depends(get
 
 # ----- SPREADSHEET -----
 @api.post("/projects/{project_id}/spreadsheet/spec")
-async def spreadsheet_spec(project_id: str, user: dict = Depends(get_current_user)):
+async def spreadsheet_spec(project_id: str, request: Request, user: dict = Depends(get_current_user)):
     proj = await load_project(project_id)
     check_access(proj, user)
-    await claim_if_needed(proj, user)
+    await claim_if_needed(proj, user, request)
     opp = _require_pipeline(proj)
     async def _do():
         return await agents.generate_spreadsheet_spec(opp, proj["positioning"], proj["transformation"], proj.get("product_language", "id"), {})
@@ -1007,10 +1062,10 @@ def _web_defaults(web: dict) -> dict:
 
 
 @api.post("/projects/{project_id}/website/spec")
-async def website_spec(project_id: str, body: WebsiteStyleBody, user: dict = Depends(get_current_user)):
+async def website_spec(project_id: str, body: WebsiteStyleBody, request: Request, user: dict = Depends(get_current_user)):
     proj = await load_project(project_id)
     check_access(proj, user)
-    await claim_if_needed(proj, user)
+    await claim_if_needed(proj, user, request)
     opp = _require_pipeline(proj)
     async def _do():
         return await agents.generate_website_spec(opp, proj["positioning"], proj["transformation"], body.style, proj.get("product_language", "id"), {})
@@ -1315,10 +1370,10 @@ class BrandingBody(BaseModel):
 
 
 @api.post("/projects/{project_id}/branding")
-async def gen_branding(project_id: str, body: BrandingBody, user: dict = Depends(get_current_user)):
+async def gen_branding(project_id: str, body: BrandingBody, request: Request, user: dict = Depends(get_current_user)):
     proj = await load_project(project_id)
     check_access(proj, user)
-    await claim_if_needed(proj, user)
+    await claim_if_needed(proj, user, request)
     opp = _require_pipeline(proj)
     async def _do():
         return await agents.generate_branding(opp, proj["positioning"], proj["transformation"], body.style, proj.get("product_language", "id"), {})
@@ -1510,10 +1565,31 @@ async def create_sample(user: Optional[dict] = Depends(get_optional_user)):
 app.include_router(api)
 app.include_router(auth_router)
 
+# SEC-04: allow_credentials=True + a wildcard allow_origins is not a broader
+# grant of access — browsers refuse to honor "*" together with credentialed
+# (cookie-based) requests at all, so this combination doesn't work loosely,
+# it simply BREAKS cross-origin cookie auth silently the moment frontend and
+# backend are on different origins (the normal case for any real deployment).
+# Fail fast with a clear error instead of letting an operator discover this
+# via a confusing "login does nothing" bug report, unless they've explicitly
+# acknowledged the wildcard is intentional (e.g. same-origin local dev).
+_cors_origins_raw = os.environ.get("CORS_ORIGINS", "*")
+_cors_origins = [o.strip() for o in _cors_origins_raw.split(",") if o.strip()]
+if _cors_origins_raw.strip() == "*" and os.environ.get("KHOVA_ALLOW_WILDCARD_CORS", "false").lower() not in ("1", "true", "yes"):
+    raise RuntimeError(
+        "CORS_ORIGINS is unset (defaults to '*'), which is incompatible with "
+        "allow_credentials=True: browsers will not send/accept cookies on a "
+        "wildcard-origin response, so cross-origin login will silently fail. "
+        "Set CORS_ORIGINS to your real frontend origin(s), comma-separated "
+        "(e.g. CORS_ORIGINS=https://app.example.com), or set "
+        "KHOVA_ALLOW_WILDCARD_CORS=true to explicitly acknowledge this for "
+        "same-origin local development only."
+    )
+
 app.add_middleware(
     CORSMiddleware,
     allow_credentials=True,
-    allow_origins=os.environ.get("CORS_ORIGINS", "*").split(","),
+    allow_origins=_cors_origins,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -1521,6 +1597,7 @@ app.add_middleware(
 
 @app.on_event("startup")
 async def _startup_indexes():
+    await ensure_core_indexes()
     await ratelimit.ensure_indexes()
 
 

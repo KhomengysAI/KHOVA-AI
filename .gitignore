@@ -83,6 +83,11 @@ android-sdk/
 .env
 .env.*
 *.env
+# ...but keep the checked-in example files that document required variables
+# (see backend/.env.example, frontend/.env.example) — negations must come
+# after the patterns they override.
+!.env.example
+!**/.env.example
 credentials.json
 *.key
 .credentials
