@@ -64,20 +64,31 @@ def _now() -> datetime:
 
 
 def client_ip(request) -> str:
-    """Resolve the real client IP, honouring the Kubernetes ingress proxy.
-    Never trusts a body/header the client could freely spoof for identity —
-    X-Forwarded-For is set by the ingress and is the best available signal."""
+    """Resolve the client identity used to key anonymous rate limiting.
+
+    X-Forwarded-For / X-Real-IP are only trusted when KHOVA_TRUST_PROXY_HEADERS
+    is explicitly set — they are otherwise trivially spoofable by any caller,
+    which would let an attacker get a fresh rate-limit bucket on every request
+    by sending a new value each time. Defaulting to OFF means an unconfigured
+    or directly-reachable deployment fails CLOSED to the actual socket peer
+    address (request.client.host) instead of an easily-forged header; a
+    deployment that genuinely sits behind a trusted reverse proxy which
+    overwrites (not merely appends to) X-Forwarded-For before it reaches this
+    app should set KHOVA_TRUST_PROXY_HEADERS=true.
+    """
     if request is None:
         return "unknown"
+    trust_proxy = os.environ.get("KHOVA_TRUST_PROXY_HEADERS", "false").lower() in ("1", "true", "yes")
     try:
-        xff = request.headers.get("x-forwarded-for") or request.headers.get("X-Forwarded-For")
-        if xff:
-            first = xff.split(",")[0].strip()
-            if first:
-                return first
-        xri = request.headers.get("x-real-ip")
-        if xri:
-            return xri.strip()
+        if trust_proxy:
+            xff = request.headers.get("x-forwarded-for") or request.headers.get("X-Forwarded-For")
+            if xff:
+                first = xff.split(",")[0].strip()
+                if first:
+                    return first
+            xri = request.headers.get("x-real-ip")
+            if xri:
+                return xri.strip()
         if request.client and request.client.host:
             return request.client.host
     except Exception:

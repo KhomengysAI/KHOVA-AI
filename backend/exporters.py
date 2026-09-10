@@ -4,6 +4,7 @@ and standalone responsive website HTML.
 import base64
 import html as _html
 import logging
+import re
 from io import BytesIO
 
 logger = logging.getLogger("khova.exporters")
@@ -152,6 +153,7 @@ def build_ebook_html(ebook: dict, branding: dict, transformation: dict, cover_by
     design_system = ebook.get("design_system", {}) or {}
     pal = _palette(design_system, transformation)
     L = _labels(product_language)
+    lang_attr = _html.escape(str(product_language or "id"))
     heading_font = FONT_STACKS.get((design_system.get("typography") or "serif").lower(), FONT_STACKS["serif"])
     body_font = FONT_STACKS["sans"]
 
@@ -309,7 +311,7 @@ def build_ebook_html(ebook: dict, branding: dict, transformation: dict, cover_by
 
     cover_visual = f'<img class="cover-bg" src="data:{cover_mime};base64,{base64.b64encode(cover_bytes).decode()}" />' if cover_bytes else ""
 
-    doc = f'''<!DOCTYPE html><html lang="{product_language}"><head><meta charset="utf-8"><style>{css}</style></head><body>
+    doc = f'''<!DOCTYPE html><html lang="{lang_attr}"><head><meta charset="utf-8"><style>{css}</style></head><body>
       <div class="cover">
         {cover_visual}
         <div class="cover-scrim"></div>
@@ -348,8 +350,19 @@ def build_ebook_html(ebook: dict, branding: dict, transformation: dict, cover_by
 
 def html_to_pdf(html_string: str) -> bytes:
     from weasyprint import HTML
+    from weasyprint.urls import URLFetcher
+    # Defense-in-depth for SEC-03 (SSRF): every image this app embeds is a
+    # base64 data: URI (see build_ebook_html's `illo`/cover handling) — there
+    # is no legitimate reason for WeasyPrint to ever make a network request
+    # while rendering our own generated documents. Restricting the fetcher to
+    # data: URIs means that even if a future change reintroduces an
+    # <img src="http://...">/<link href="...">-style tag into content_html
+    # (bypassing or alongside agents._sanitize_html), WeasyPrint itself will
+    # refuse to fetch it rather than reaching out to an internal host or
+    # cloud metadata endpoint on the server's behalf.
+    fetcher = URLFetcher(allowed_protocols=["data"])
     buf = BytesIO()
-    HTML(string=html_string).write_pdf(buf)
+    HTML(string=html_string, url_fetcher=fetcher.fetch).write_pdf(buf)
     return buf.getvalue()
 
 
@@ -359,6 +372,50 @@ def html_to_pdf(html_string: str) -> bytes:
 def _col_letter(idx):
     from openpyxl.utils import get_column_letter
     return get_column_letter(idx)
+
+
+# ---------------------------------------------------------------------------
+# XLSX formula/value injection guards (CWE-1236)
+# ---------------------------------------------------------------------------
+# LLM-generated formula/cell strings would otherwise be written verbatim into
+# exported XLSX files: any cell value beginning with =, +, -, or @ is
+# executable content to Excel/LibreOffice on open, regardless of the
+# column's declared type. These two helpers neutralize that before any value
+# reaches openpyxl.
+_SAFE_FORMULA_CHAR_CLASS = re.compile(r'^[A-Za-z0-9+\-*/(),:\s]*$')
+_SAFE_FORMULA_FUNCS = {"SUM", "AVERAGE", "MIN", "MAX", "IF"}
+_SAFE_CELL_REF = re.compile(r'^[A-Za-z]{1,3}\d+$')
+_SAFE_FORMULA_TOKEN = re.compile(r'[A-Za-z]+\d*')
+
+
+def _safe_cell_value(val):
+    """Neutralize formula-injection-risk values before writing a non-formula
+    cell: a string value starting with =, +, -, or @ is prefixed with a
+    literal apostrophe so the spreadsheet application treats it as text
+    rather than attempting to evaluate it as a formula."""
+    if isinstance(val, str) and val[:1] in ("=", "+", "-", "@"):
+        return "'" + val
+    return val
+
+
+def _safe_formula(formula):
+    """Return `formula` unchanged only if it matches a conservative allowlist
+    (starts with '=', and its body contains only cell references, numbers,
+    basic arithmetic operators/punctuation, and a small allowlist of
+    aggregate function names). Otherwise return None so the caller writes an
+    empty cell instead of a raw, LLM-controlled formula string."""
+    if not formula or not isinstance(formula, str) or not formula.startswith("="):
+        return None
+    body = formula[1:]
+    if not _SAFE_FORMULA_CHAR_CLASS.match(body):
+        return None
+    for token in _SAFE_FORMULA_TOKEN.findall(body):
+        if token.upper() in _SAFE_FORMULA_FUNCS:
+            continue
+        if _SAFE_CELL_REF.match(token):
+            continue
+        return None
+    return formula
 
 
 def build_xlsx(spec: dict, palette: dict = None) -> bytes:
@@ -435,9 +492,10 @@ def build_xlsx(spec: dict, palette: dict = None) -> bytes:
                 letter = _col_letter(cidx)
                 if col.get("type") == "formula" and col.get("formula_template"):
                     formula = col["formula_template"].replace("{r}", str(r))
-                    ws.cell(row=r, column=cidx, value=formula).border = border
+                    ws.cell(row=r, column=cidx, value=_safe_formula(formula)).border = border
                 else:
                     val = values[cidx - 1] if cidx - 1 < len(values) else None
+                    val = _safe_cell_value(val)
                     cell = ws.cell(row=r, column=cidx, value=val)
                     cell.border = border
                     if col.get("type") == "currency" and isinstance(val, (int, float)):
@@ -453,7 +511,7 @@ def build_xlsx(spec: dict, palette: dict = None) -> bytes:
                 for cidx, col in enumerate(columns, start=1):
                     if col.get("type") == "formula" and col.get("formula_template"):
                         formula = col["formula_template"].replace("{r}", str(r))
-                        ws.cell(row=r, column=cidx, value=formula).border = border
+                        ws.cell(row=r, column=cidx, value=_safe_formula(formula)).border = border
                     else:
                         ws.cell(row=r, column=cidx).border = border
                 r += 1
@@ -474,11 +532,15 @@ def build_xlsx(spec: dict, palette: dict = None) -> bytes:
         if totals:
             r += 1
             for t in totals:
-                col_index = t.get("col_index", 1)
+                # PERF-01: clamp an LLM-supplied col_index into the valid,
+                # 1-based column range instead of letting openpyxl raise on
+                # 0/negative/out-of-range values.
+                col_index = max(1, min(len(columns) or 1, int(t.get("col_index", 1) or 1)))
                 ws.cell(row=r, column=1, value=t.get("label", "Total")).font = Font(bold=True)
                 formula = (t.get("formula", "") or "").replace("{first}", str(data_start)).replace("{last}", str(data_end))
-                if formula:
-                    cell = ws.cell(row=r, column=col_index, value=formula)
+                safe_formula = _safe_formula(formula) if formula else None
+                if safe_formula:
+                    cell = ws.cell(row=r, column=col_index, value=safe_formula)
                     cell.font = Font(bold=True, color=accent)
                 r += 1
 
@@ -579,7 +641,7 @@ def build_website_html(spec: dict, palette: dict = None, style: str = "Modern", 
     included_list = li_list(included.get("items"))
 
     return f'''<!DOCTYPE html>
-<html lang="{product_language}"><head><meta charset="utf-8">
+<html lang="{esc(product_language)}"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{esc(brand)}</title>
 <style>

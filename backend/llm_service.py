@@ -50,6 +50,13 @@ def lang_name(code: str) -> str:
     return LANG_NAMES.get((code or "id").lower(), code or "Indonesian")
 
 
+# Languages actually covered by the structural label tables (agents.SECTION_LABELS,
+# exporters.LABELS), as opposed to LANG_NAMES above (which also lists zh/ar/hi that
+# those tables don't yet support). This is the single source of truth used to
+# validate product_language/ui_language at the API boundary — see server.py.
+SUPPORTED_LANGUAGES = frozenset({"id", "en", "es", "fr", "de", "pt", "ja"})
+
+
 def _resolve(category: str, models_config: dict):
     cfg = (models_config or {}).get(category) if models_config else None
     if cfg and cfg.get("provider") and cfg.get("model"):
