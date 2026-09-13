@@ -339,7 +339,7 @@ async def generate_ebook_plan(opportunity, positioning, transformation, product_
         '  \"meta\": {\"title\": str, \"subtitle\": str, \"audience\": str, \"core_promise\": str, \"description\": str,\n'
         '            \"learning_outcomes\": [str], \"reading_time\": str, \"chapter_count\": int,\n'
         '            \"is_math_heavy\": bool},\n'
-        '  \"toc\": [ {\"chapter_num\": 1, \"title\": str, \"purpose\": str, \"key_lesson\": str, \"kind\": \"standard|action_plan\",\n'
+        '  \"toc\": [ {\"chapter_num\": 1, \"title\": str, \"purpose\": str, \"key_lesson\": str, \"reader_can_do_after\": str, \"concepts_owned\": [str], \"must_not_repeat\": [str], \"kind\": \"standard|action_plan\",\n'
         '             \"needs_worked_example\": bool, \"needs_exercise\": bool} ],\n'
         '  \"visuals\": [ {\"chapter_num\": 1, \"purpose\": str, \"visual_type\": \"illustration|diagram|process_flow|infographic|comparison|framework|decision_tree|timeline|chart\",\n'
         '                \"prompt\": \"detailed image generation prompt (no text/words in the image)\", \"aspect_ratio\": \"1:1|4:3|16:9|3:4\", \"placement\": \"chapter_top\"} ],\n'
@@ -349,6 +349,19 @@ async def generate_ebook_plan(opportunity, positioning, transformation, product_
         "}\n"
         "Rules:\n"
         "- 6-10 chapters unless the topic clearly needs otherwise.\n"
+        "- Every chapter must have ONE distinct job in the reader's progression. "
+        "Do not create chapters that merely re-explain the same framework from a different angle.\n"
+        "- Treat the table of contents as a curriculum, not a list of related topics. "
+        "Each major concept should have ONE clear chapter owner.\n"
+        "- Assign each chapter explicit 'concepts_owned' that it teaches deeply. "
+        "'must_not_repeat' must list concepts that belong to other chapters or have already been taught.\n"
+        "- 'reader_can_do_after' must describe a concrete capability the reader gains after completing the chapter. "
+        "Each chapter must move the reader toward the final transformation.\n"
+        "- Avoid distributing the same concepts across many chapters. "
+        "For example, if niche selection belongs to Chapter 2, later chapters should apply the chosen niche rather than reteach niche selection.\n"
+        "- Do not repeat generic frameworks such as niche selection, product format selection, pricing, validation, positioning, or sales-page structure in multiple chapters unless repetition is essential to a genuinely new application.\n"
+        "- Each chapter must introduce substantial new knowledge, a new decision, a new skill, or a new execution stage. "
+        "An example may reference earlier concepts, but must not restart the lesson from zero.\n"
         "- The LAST chapter in toc MUST have kind=\"action_plan\": a synthesis/toolkit chapter that turns the whole "
         "book into a concrete step-by-step plan the reader can execute immediately (not a repeat of earlier content).\n"
         "- For educational/how-to topics, mark needs_worked_example=true and needs_exercise=true on the chapters "
@@ -370,7 +383,14 @@ async def generate_ebook_plan(opportunity, positioning, transformation, product_
     return plan
 
 
-async def generate_ebook_section(chapter, ebook_meta, transformation, product_language, models_config, tone="professional and clear"):
+async def generate_ebook_section(
+    chapter,
+    ebook_meta,
+    transformation,
+    product_language,
+    models_config,
+    tone="professional and clear",
+    full_toc=None ):
     lang = lang_name(product_language)
     SL = _section_labels(product_language)
     is_action_plan = (chapter.get("kind") == "action_plan")
@@ -383,6 +403,13 @@ async def generate_ebook_section(chapter, ebook_meta, transformation, product_la
         "Use EXACTLY the heading words provided below; do not substitute English or any other language."
         + (f"\n{MATH_NOTATION_RULES}" if is_math else "")
     )
+    toc_context = ""
+    if full_toc:
+        toc_context = (
+            "\n\n=== FULL BOOK STRUCTURE ===\n"
+            f"{json.dumps(full_toc, ensure_ascii=False, indent=2)}\n"
+            "Use this structure to prevent repetition and preserve progression across chapters.\n"
+        )
     closing_block = (
         "This is the FINAL chapter of the book and must function as a concrete ACTION PLAN / toolkit synthesis: "
         "give the reader a numbered, executable step-by-step plan (with timeframe suggestions), a short checklist "
@@ -400,9 +427,20 @@ async def generate_ebook_section(chapter, ebook_meta, transformation, product_la
         f"Ebook: {ebook_meta.get('title','')} — {ebook_meta.get('subtitle','')}\n"
         f"Audience: {ebook_meta.get('audience','')}\n"
         f"Core promise: {ebook_meta.get('core_promise','')}\n"
-        f"Core transformation: {transformation.get('core_transformation','') if transformation else ''}\n\n"
+        f"Core transformation: {transformation.get('core_transformation','') if transformation else ''}\n"
+        f"{toc_context}\n"        
         f"Write chapter {chapter.get('chapter_num')}: \"{chapter.get('title')}\".\n"
         f"Chapter purpose: {chapter.get('purpose','')}. Key lesson: {chapter.get('key_lesson','')}.\n\n"
+        "CHAPTER OWNERSHIP RULES:\n"
+        f"- This chapter's unique capability: {chapter.get('reader_can_do_after','')}\n"
+        f"- Concepts this chapter OWNS and should teach deeply: "
+        f"{json.dumps(chapter.get('concepts_owned', []), ensure_ascii=False)}\n"
+        f"- Concepts this chapter MUST NOT reteach: "
+        f"{json.dumps(chapter.get('must_not_repeat', []), ensure_ascii=False)}\n"
+        "- Do not restart concepts owned by earlier chapters.\n"
+        "- When an earlier concept is needed, reference it briefly and move forward.\n"
+        "- Do not repeat another chapter's framework, scoring system, checklist, or explanation unless this chapter applies it in a genuinely new way.\n"
+        "- The reader should finish this chapter knowing or being able to DO something they could not do after the previous chapter.\n\n"
         f"{closing_block}\n\n"
         "Return ONLY clean semantic HTML (no <html>/<body> wrapper, no markdown). Use these building blocks where appropriate.\n"
         f"IMPORTANT — use these EXACT heading words (they are already in the correct language, {lang}):\n"
