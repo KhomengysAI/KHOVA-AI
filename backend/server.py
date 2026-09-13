@@ -835,8 +835,15 @@ async def ebook_section(project_id: str, body: SectionBody, user: dict = Depends
     if not chapter:
         raise HTTPException(status_code=404, detail="Chapter not found")
     async def _do():
-        return await agents.generate_ebook_section(chapter, ebook.get("meta", {}), proj.get("transformation"), proj.get("product_language", "id"), {}, body.tone or "professional and clear")
-    html, meta = await run_ai(user, proj, "ebook_section", _do)
+        return await agents.generate_ebook_section(
+            chapter,
+            ebook.get("meta", {}),
+            proj.get("transformation"),
+            proj.get("product_language", "id"),
+            {},
+            body.tone or "professional and clear",
+            full_toc=ebook.get("toc", [])
+        )    html, meta = await run_ai(user, proj, "ebook_section", _do)
     sections = [s for s in ebook.get("sections", []) if s.get("chapter_num") != body.chapter_num]
     sections.append({"chapter_num": body.chapter_num, "title": chapter.get("title"), "content_html": html, "status": "done"})
     sections.sort(key=lambda s: s.get("chapter_num", 0))
